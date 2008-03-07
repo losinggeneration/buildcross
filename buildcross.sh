@@ -318,9 +318,19 @@ UntarPatch()
 {
 	CreateDir
 
-	if ! Untar $1; then
+	# check if the directory for the source exists
+	# and that we got to touch that it's untared
+	if [ ! -d $1 -o ! -e $1/.untared ]; then
+		Untar $1
+		Result "Untaring"
+		# A quick way to tell if we need to untar or not
+		touch $1/.untared
+	fi
+	
+	if ! CheckExists $1/.patched; then 
 		Patch $2 $1
 		Result "Patching"
+		touch $1/.patched
 	fi
 }
 
@@ -329,48 +339,31 @@ UntarPatch()
 ###############################################################################
 Untar()
 {
-	# check if the directory for the source exists
-	# and that we got to touch that it's untared
-	if [ ! -d $1 -o ! -e $1/.untared ]; then
-		# Now check if the tar.bz2 file exists
-		if ! CheckExists $1.tar.bz2; then
-			# if it doesn't try for tar.gz
-			if ! CheckExists $1.tar.gz; then
-				# if not we don't have the archive so
-				# download it
-				if ! Download $1; then
-					echo "Error downloading file and file not found. Exiting now."
-					exec false
-				fi
-
-				# We need to untar it after it's downloaded
-				# and return the value. It would have been
-				# nice if I could have did a "return Untar $1"
-				if Untar $1; then	
-					return 1
-				else
-					return 0
-				fi
-			else
-				# We have the tar.gz hooray
-				echo "Untaring $1.tar.gz"
-				tar xfz $1.tar.gz
-				# A quick way to tell if we need to untar or not
-				touch $1/.untared
-				return 1
+	# Now check if the tar.bz2 file exists
+	if ! CheckExists $1.tar.bz2; then
+		# if it doesn't try for tar.gz
+		if ! CheckExists $1.tar.gz; then
+			# if not we don't have the archive so
+			# download it
+			if ! Download $1; then
+				echo "Error downloading file and file not found. Exiting now."
+				exec false
 			fi
-		else
-			# Well we have the tar.bz2 good job
-			echo "Untaring $1.tar.bz2"
-			tar xfj $1.tar.bz2
-			# A quick way to tell if we need to untar or not
-			touch $1/.untared
-			return 1
-		fi
-	fi
 
-	# We didn't need to untar because the directory already existed
-	return 0
+			# We need to untar it after it's downloaded
+			# and return the value. It would have been
+			# nice if I could have did a "return Untar $1"
+			Untar $1	
+		else
+			# We have the tar.gz hooray
+			echo "Untaring $1.tar.gz"
+			tar xfz $1.tar.gz
+		fi
+	else
+		# Well we have the tar.bz2 good job
+		echo "Untaring $1.tar.bz2"
+		tar xfj $1.tar.bz2
+	fi
 }
 
 ###############################################################################

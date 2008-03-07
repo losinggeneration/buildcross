@@ -47,7 +47,7 @@ Version 1.4:
 	 information read README in patches directory.
 	-Added -allc for building compiler and removing sources and objects
 	 after each is built.
-	-Added -dcc for building the dreamcast compiler, but it will clean the
+	-Added -dcc for building the Dreamcast compiler, but it will clean the
 	 source and objects after each is successfully built (If interrupted,
 	 it will still resume where it left off. -c must be run to start over)
 	-Added -i to rerun make installs even if .installed is found.
@@ -62,3 +62,45 @@ Version 1.4:
 	-Added patches/ix86 for completeness.
 	-Added a kos patch which adds -R.stack to kos-objcopy if -O binary is
 	 given in the command line. Patch disabled by default.
+
+Version 1.5:
+	-Added Dreamcast Linux target with function to build uClibc.
+	-Imported some patches from buildroot.
+	-Fixed bug for options getting the correct INSTALL path.
+	-Removed $TARGET $PREFIX from Configure functions and put it once in
+	 SetOptions.
+	-Added -c to Wget's commands so it can try to continue if a download
+	 fails.
+	-Put options into separate files to clean up code a bit (removing a
+	 large case statement.) Updated how to add a target to reflect this.
+	-Arm now uses SetOptions instead of it's own function and options are
+	 in DcArm.cfg.
+	-Changed -t2 option to more descriptive dcarm.
+	-Gcc, Binutils, Newlib, etc are now defined on a per system basis.
+	 Dreamcast can  have different versions of Gcc than Gamecube or even
+	 the Dreamcast Arm Gcc.
+	-Added quotes around test for TESTING to be consistent with the rest
+	 of the user enablable options.
+	-TESTING should now be pointed to the directory where you want the
+	 compiler installed.
+	-Moved code into separate files to so there is a few files with
+	 specific content rather than one large file with everything.
+	-Using THREADS=posix was always kinda flaky, but I think I'm making
+	 that the default now. Genesis doesn't use threads and thus uses
+	 --disable-threads anyways. For this, it is suggested you use this
+	 version of buildcross to make a new toolchain.
+	-Defaults for Gamecube now: Gcc-4.1.0, BinUtils-2.16.1, Newlib-1.14.0.
+	-Added a NOTES file to explain the state of the toolchains.
+	-Removed some of the older patches.
+	-Downloads should continue if interrupted now.
+	-Targets are built in target directories rather than in the base
+	 directory. Also, gcc, binutils, etc are extracted to and patched in
+	 the target directory allowing building separate chains without
+	 deleting gcc, binutils, etc between builds. 
+	-Patch and Result now log if told to.
+	-Fixed SENDTO/ERRORTO output if file didn't exist.
+	-echo is no longer used, logging functions (which are the only ones
+	 allowed to use echo) are used instead.
+	-Made some changes to building KOS to allow ix86 to build KOS too.
+	-Added ix86 to to top of buildcross options. Oops.
+	-Removed some patches that were not needed.

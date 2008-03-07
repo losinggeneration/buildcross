@@ -1,7 +1,7 @@
-diff -NBaur newlib-1.13.0/config.sub newlib-1.13.0-new/config.sub
---- newlib-1.13.0/config.sub	Tue Nov 16 01:18:39 2004
-+++ newlib-1.13.0-new/config.sub	Sun Feb 27 12:17:44 2005
-@@ -219,6 +219,9 @@
+diff -Nbaur newlib-1.14.0/config.sub newlib-1.14.0-ppc/config.sub
+--- newlib-1.14.0/config.sub	Mon Dec 12 11:24:58 2005
++++ newlib-1.14.0-ppc/config.sub	Mon Apr 10 09:33:58 2006
+@@ -228,6 +228,9 @@
  		basic_machine=m68k-atari
  		os=-mint
  		;;
@@ -11,10 +11,10 @@ diff -NBaur newlib-1.13.0/config.sub newlib-1.13.0-new/config.sub
  esac
  
  # Decode aliases for certain CPU-COMPANY combinations.
-diff -NBaur newlib-1.13.0/newlib/configure.host newlib-1.13.0-new/newlib/configure.host
---- newlib-1.13.0/newlib/configure.host	Tue Oct  5 20:44:24 2004
-+++ newlib-1.13.0-new/newlib/configure.host	Sun Feb 27 12:17:44 2005
-@@ -389,6 +389,9 @@
+diff -Nbaur newlib-1.14.0/newlib/configure.host newlib-1.14.0-ppc/newlib/configure.host
+--- newlib-1.14.0/newlib/configure.host	Mon Dec 12 11:25:07 2005
++++ newlib-1.14.0-ppc/newlib/configure.host	Mon Apr 10 09:33:58 2006
+@@ -406,6 +406,9 @@
    powerpcle-*-pe)
  	posix_dir=posix
  	;;
@@ -24,9 +24,9 @@ diff -NBaur newlib-1.13.0/newlib/configure.host newlib-1.13.0-new/newlib/configu
    sh*-*)
  	sys_dir=sh
  	;;
-diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/Makefile.am newlib-1.13.0-new/newlib/libc/sys/ppcgekko/Makefile.am
---- newlib-1.13.0/newlib/libc/sys/ppcgekko/Makefile.am	Thu Jan  1 00:00:00 1970
-+++ newlib-1.13.0-new/newlib/libc/sys/ppcgekko/Makefile.am	Sun Feb 27 12:17:44 2005
+diff -Nbaur newlib-1.14.0/newlib/libc/sys/ppcgekko/Makefile.am newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/Makefile.am
+--- newlib-1.14.0/newlib/libc/sys/ppcgekko/Makefile.am	Thu Jan  1 00:00:00 1970
++++ newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/Makefile.am	Mon Apr 10 09:33:58 2006
 @@ -0,0 +1,19 @@
 +## Process this file with automake to generate Makefile.in
 +
@@ -47,9 +47,9 @@ diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/Makefile.am newlib-1.13.0-new
 +
 +ACLOCAL_AMFLAGS = -I ../../..
 +CONFIG_STATUS_DEPENDENCIES = $(newlib_basedir)/configure.host
-diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/Makefile.in newlib-1.13.0-new/newlib/libc/sys/ppcgekko/Makefile.in
---- newlib-1.13.0/newlib/libc/sys/ppcgekko/Makefile.in	Thu Jan  1 00:00:00 1970
-+++ newlib-1.13.0-new/newlib/libc/sys/ppcgekko/Makefile.in	Sun Feb 27 12:17:44 2005
+diff -Nbaur newlib-1.14.0/newlib/libc/sys/ppcgekko/Makefile.in newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/Makefile.in
+--- newlib-1.14.0/newlib/libc/sys/ppcgekko/Makefile.in	Thu Jan  1 00:00:00 1970
++++ newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/Makefile.in	Mon Apr 10 09:33:58 2006
 @@ -0,0 +1,341 @@
 +# Makefile.in generated automatically by automake 1.4-p6 from Makefile.am
 +
@@ -392,9 +392,9 @@ diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/Makefile.in newlib-1.13.0-new
 +# Tell versions [3.59,3.63) of GNU make to not export all variables.
 +# Otherwise a system limit (for SysV at least) may be exceeded.
 +.NOEXPORT:
-diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/aclocal.m4 newlib-1.13.0-new/newlib/libc/sys/ppcgekko/aclocal.m4
---- newlib-1.13.0/newlib/libc/sys/ppcgekko/aclocal.m4	Thu Jan  1 00:00:00 1970
-+++ newlib-1.13.0-new/newlib/libc/sys/ppcgekko/aclocal.m4	Sun Feb 27 12:17:44 2005
+diff -Nbaur newlib-1.14.0/newlib/libc/sys/ppcgekko/aclocal.m4 newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/aclocal.m4
+--- newlib-1.14.0/newlib/libc/sys/ppcgekko/aclocal.m4	Thu Jan  1 00:00:00 1970
++++ newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/aclocal.m4	Mon Apr 10 09:33:58 2006
 @@ -0,0 +1,382 @@
 +dnl aclocal.m4 generated automatically by aclocal 1.4-p6
 +
@@ -778,9 +778,9 @@ diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/aclocal.m4 newlib-1.13.0-new/
 +]
 +)
 +
-diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/configure newlib-1.13.0-new/newlib/libc/sys/ppcgekko/configure
---- newlib-1.13.0/newlib/libc/sys/ppcgekko/configure	Thu Jan  1 00:00:00 1970
-+++ newlib-1.13.0-new/newlib/libc/sys/ppcgekko/configure	Sun Feb 27 12:17:44 2005
+diff -Nbaur newlib-1.14.0/newlib/libc/sys/ppcgekko/configure newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/configure
+--- newlib-1.14.0/newlib/libc/sys/ppcgekko/configure	Thu Jan  1 00:00:00 1970
++++ newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/configure	Mon Apr 10 09:33:58 2006
 @@ -0,0 +1,1906 @@
 +#! /bin/sh
 +
@@ -2688,9 +2688,9 @@ diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/configure newlib-1.13.0-new/n
 +rm -fr confdefs* $ac_clean_files
 +test "$no_create" = yes || ${CONFIG_SHELL-/bin/sh} $CONFIG_STATUS || exit 1
 +
-diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/configure.in newlib-1.13.0-new/newlib/libc/sys/ppcgekko/configure.in
---- newlib-1.13.0/newlib/libc/sys/ppcgekko/configure.in	Thu Jan  1 00:00:00 1970
-+++ newlib-1.13.0-new/newlib/libc/sys/ppcgekko/configure.in	Sun Feb 27 12:17:44 2005
+diff -Nbaur newlib-1.14.0/newlib/libc/sys/ppcgekko/configure.in newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/configure.in
+--- newlib-1.14.0/newlib/libc/sys/ppcgekko/configure.in	Thu Jan  1 00:00:00 1970
++++ newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/configure.in	Mon Apr 10 09:33:58 2006
 @@ -0,0 +1,12 @@
 +dnl This is the newlib/libc/sys/ppcgekko configure.in file.
 +dnl Process this file with autoconf to produce a configure script.
@@ -2704,23 +2704,23 @@ diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/configure.in newlib-1.13.0-ne
 +NEWLIB_CONFIGURE(../../..)
 +
 +AC_OUTPUT(Makefile)
-diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/crt0.c newlib-1.13.0-new/newlib/libc/sys/ppcgekko/crt0.c
---- newlib-1.13.0/newlib/libc/sys/ppcgekko/crt0.c	Thu Jan  1 00:00:00 1970
-+++ newlib-1.13.0-new/newlib/libc/sys/ppcgekko/crt0.c	Sun Feb 27 12:17:44 2005
+diff -Nbaur newlib-1.14.0/newlib/libc/sys/ppcgekko/crt0.c newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/crt0.c
+--- newlib-1.14.0/newlib/libc/sys/ppcgekko/crt0.c	Thu Jan  1 00:00:00 1970
++++ newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/crt0.c	Mon Apr 10 09:33:58 2006
 @@ -0,0 +1,4 @@
 +/* I have a copy of something that would serve as a NetWare crt0.o,
 +   but it is copyright by Novell.  */
 +
 +int _dummy_crt0 = 1;
-diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/include/newlib.h newlib-1.13.0-new/newlib/libc/sys/ppcgekko/include/newlib.h
---- newlib-1.13.0/newlib/libc/sys/ppcgekko/include/newlib.h	Thu Jan  1 00:00:00 1970
-+++ newlib-1.13.0-new/newlib/libc/sys/ppcgekko/include/newlib.h	Sun Feb 27 12:17:44 2005
+diff -Nbaur newlib-1.14.0/newlib/libc/sys/ppcgekko/include/newlib.h newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/include/newlib.h
+--- newlib-1.14.0/newlib/libc/sys/ppcgekko/include/newlib.h	Thu Jan  1 00:00:00 1970
++++ newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/include/newlib.h	Mon Apr 10 09:33:58 2006
 @@ -0,0 +1,2 @@
 +/* dummy file for external tools to use.  Real file is created by
 +   newlib configuration. */
-diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/machine/malloc.h newlib-1.13.0-new/newlib/libc/sys/ppcgekko/machine/malloc.h
---- newlib-1.13.0/newlib/libc/sys/ppcgekko/machine/malloc.h	Thu Jan  1 00:00:00 1970
-+++ newlib-1.13.0-new/newlib/libc/sys/ppcgekko/machine/malloc.h	Sun Feb 27 12:17:44 2005
+diff -Nbaur newlib-1.14.0/newlib/libc/sys/ppcgekko/machine/malloc.h newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/machine/malloc.h
+--- newlib-1.14.0/newlib/libc/sys/ppcgekko/machine/malloc.h	Thu Jan  1 00:00:00 1970
++++ newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/machine/malloc.h	Mon Apr 10 09:33:58 2006
 @@ -0,0 +1,8 @@
 +#ifndef	_MACHMALLOC_H_
 +#define	_MACHMALLOC_H_
@@ -2730,9 +2730,9 @@ diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/machine/malloc.h newlib-1.13.
 +#endif	/* _MACHMALLOC_H_ */
 +
 +
-diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/machine/stdlib.h newlib-1.13.0-new/newlib/libc/sys/ppcgekko/machine/stdlib.h
---- newlib-1.13.0/newlib/libc/sys/ppcgekko/machine/stdlib.h	Thu Jan  1 00:00:00 1970
-+++ newlib-1.13.0-new/newlib/libc/sys/ppcgekko/machine/stdlib.h	Sun Feb 27 12:17:44 2005
+diff -Nbaur newlib-1.14.0/newlib/libc/sys/ppcgekko/machine/stdlib.h newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/machine/stdlib.h
+--- newlib-1.14.0/newlib/libc/sys/ppcgekko/machine/stdlib.h	Thu Jan  1 00:00:00 1970
++++ newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/machine/stdlib.h	Mon Apr 10 09:33:58 2006
 @@ -0,0 +1,8 @@
 +#ifndef	_MACHSTDLIB_H_
 +#define	_MACHSTDLIB_H_
@@ -2742,9 +2742,9 @@ diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/machine/stdlib.h newlib-1.13.
 +#endif	/* _MACHSTDLIB_H_ */
 +
 +
-diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/sys/lock.h newlib-1.13.0-new/newlib/libc/sys/ppcgekko/sys/lock.h
---- newlib-1.13.0/newlib/libc/sys/ppcgekko/sys/lock.h	Thu Jan  1 00:00:00 1970
-+++ newlib-1.13.0-new/newlib/libc/sys/ppcgekko/sys/lock.h	Thu Apr 14 09:04:31 2005
+diff -Nbaur newlib-1.14.0/newlib/libc/sys/ppcgekko/sys/lock.h newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/sys/lock.h
+--- newlib-1.14.0/newlib/libc/sys/ppcgekko/sys/lock.h	Thu Jan  1 00:00:00 1970
++++ newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/sys/lock.h	Mon Apr 10 09:33:58 2006
 @@ -0,0 +1,53 @@
 +#ifndef __SYS_LOCK_H__
 +#define __SYS_LOCK_H__
@@ -2799,9 +2799,9 @@ diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/sys/lock.h newlib-1.13.0-new/
 +extern int __libc_lock_release(int*);
 +
 +#endif /* __SYS_LOCK_H__ */
-diff -NBaur newlib-1.13.0/newlib/libc/sys/ppcgekko/sys/stdio.h newlib-1.13.0-new/newlib/libc/sys/ppcgekko/sys/stdio.h
---- newlib-1.13.0/newlib/libc/sys/ppcgekko/sys/stdio.h	Thu Jan  1 00:00:00 1970
-+++ newlib-1.13.0-new/newlib/libc/sys/ppcgekko/sys/stdio.h	Sun Feb 27 12:17:44 2005
+diff -Nbaur newlib-1.14.0/newlib/libc/sys/ppcgekko/sys/stdio.h newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/sys/stdio.h
+--- newlib-1.14.0/newlib/libc/sys/ppcgekko/sys/stdio.h	Thu Jan  1 00:00:00 1970
++++ newlib-1.14.0-ppc/newlib/libc/sys/ppcgekko/sys/stdio.h	Mon Apr 10 09:33:58 2006
 @@ -0,0 +1,25 @@
 +#ifndef _NEWLIB_STDIO_H
 +#define _NEWLIB_STDIO_H

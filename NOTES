@@ -1,0 +1,62 @@
+Here is a quick list of things to keep in mind.
+
+General
+	You must manually remove binutils, gcc, and newlib before you build a
+	new toolchain. I haven't got around to implementing a clean way to get
+	around this yet. It will probably be in 1.6.
+
+Dreamcast
+	This is about the only target I test regularly, which is why I post the
+	script to KOS's mailing list. If anything doesn't work because of the
+	toolchain, tell me and it will be usually fixed within a couple of days.
+	Unless of course I can't figure out what the problem is, it may take a 
+	bit longer in that case :-P
+
+DcLinux
+	This is the other target I've been focusing on because of my own
+	interest. When version 1.6 is/was released, the DcLinux should work
+	fine. As of 1.5 I'm unsure if it's working or not. I not getting output
+	from the serial cable. Another one where if something doesn't work, let
+	me know and it will get fixed pretty quick.
+
+Gamecube
+	I wouldn't suggest you to use the this script to build a Gamecube
+	compiler because devkitPro has a script much more specialized for the
+	Gamecube, PSP, GBA, and DS. If something doesn't work quite right you
+	can tell me, but it will generally be lower priority to me than a
+	problem with the Dreamcast. It was mainly here because I wanted to
+	learn more about building different compiler targets. I have got a
+	working compiler in the past, but some things are up to you to do.
+
+Genesis
+	Is a pretty simplistic compiler because most of the coding done on 
+	that system will be in assembly anyways. So this target doesn't seem to
+	need a whole lot of maintenance.
+
+Ix86
+	This compiler is compiled for 686 by default. If you plan to make
+	something for prior to Pentium 2 processors, you'll need to change it to
+	586. As of right now I haven't tested it much more than making sure it
+	compiles a few test files. When I have a bit of time I want to get KOS's
+	svn version working with this target again. No promises though. 
+
+Cross-compiling
+	From my experience you'll need the following to attempt to cross compile
+	to MinGW: an already built toolchain for the target you wish to make, the
+	sources for MinGW's Gcc, version 3.4.5 has worked for me, you'll need gcc-
+	core and gcc-c++ in most cases, extract them to the sub-directory(s), move
+	the directory to the correct gcc-version (version is the number not 
+	actually "version") , patch gcc, touch .untared and .patched to the
+	gcc-version directory. Then you can attempt to run buildcross.sh  with 
+	HOSTPRE=mingw32 TESTING=1 ./buildcross.sh -dc (if the cross compiler is
+	mingw32-gcc for example.) I highly suggest using TESTING so it doesn't 
+	install to where you have you're current cross compiler. 
+
+Compiling toolchains with MinGW
+	I don't think I ever got this to work (but I didn't use MinGW's Gcc 
+	sources either.) I think there is a good chance it would work, but I 
+	don't feel like trying myself. You'll need Msys in addition to MinGW. 
+	Like for cross-compiling, you'll need MinGW's Gcc sources and have to 
+	extract, patch, and touch the files by hand. From there you should be
+	able to run buildcross.sh. IIRC, you have to run bash buildcross.sh 
+	otherwise you get a "bad interpreter" error.

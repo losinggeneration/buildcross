@@ -1,9 +1,8 @@
+#!/bin/sh
 ###############################################################################
-# Copyright 2000-2006
+# Copyright 2000-2007
 #         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
 #         All rights reserved.
-###############################################################################
-#!/bin/bash
 ###############################################################################
 # Configure Binutils
 ###############################################################################
@@ -15,16 +14,16 @@ ConfigureBin()
 	LogTitle "Configuring Binutils"
 	# Try to Untar and Patch Binutils if needed
 	UntarPatch $BINVER $BINPATCH
-	
+
 	# Check if we've already configured. If not, configure
 	if ! CheckExists $BINBUILD/.configure; then
 		# Remove the contents of the build directory
 		Remove $BINBUILD
 		# Go to the build directory
-		cd $BASEDIR/$BINBUILD 
+		QuietExec "cd $BASEDIR/$BINBUILD"
 
 		ExecuteCmd "../$BINVER/configure $BINOPTS" "Configuring Binutils"
-		touch .configure
+		QuietExec "touch .configure"
 	else
 		LogTitle "Binutils Already configured"
 	fi
@@ -42,83 +41,91 @@ ConfigureBin()
 BuildBin()
 {
 	LogTitle "Building Binutils"
-	
+
 	# Check if we've installed binutils already
 	if ! CheckExists $BINBUILD/.installed; then
 		# Change to the build directory
-		cd $BASEDIR/$BINBUILD
+		QuietExec "cd $BASEDIR/$BINBUILD"
 
 		ExecuteCmd "$MAKE all"
 
 		# This is kind of hacky
-		if [ "$HOSTPRE" ]; then
-			sed "s/SUBDIRS = doc po/SUBDIRS = po/" bfd/Makefile > tmp
-			ExecuteCmd "mv tmp bfd/Makefile"
-		fi
+		# Not needed anymore?
+#		if [ "$HOSTPRE" ]; then
+#			ExecuteCmd "sed \"s/SUBDIRS = doc po/SUBDIRS = po/\" -i bfd/Makefile"
+#		fi
 
 		ExecuteCmd "$MAKE install" "Building Binutils"
-		
-		touch .installed
+		if [ "$SHELF" ]; then
+			ExecuteCmd "$MAKE install-bfd" "Install libbfd"
+		fi
+
+		QuietExec "touch .installed"
 	else
 		LogTitle "Binutils already installed"
 	fi
 
 	# Go back to the base directory
-	cd $BASEDIR
+	QuietExec "cd $BASEDIR"
 }
 
 ###############################################################################
-# Configure the base Gcc for building Newlib
+# Configure Gcc
+# $1 values: "Initial" or "Final"
 ###############################################################################
-ConfigureBaseGcc()
+ConfigureGcc()
 {
-	LogTitle "Configuring initial Gcc"
+	LogTitle "Configuring $1 Gcc"
 	UntarPatch $GCCVER $GCCPATCH
 
-	# Don't configure base if the final is configured
-	if ! CheckExists $GCCBUILD/.finalconfig; then
-		if ! CheckExists $GCCBUILD/.configure; then
-			Remove $GCCBUILD
-			cd $BASEDIR/$GCCBUILD
+	if ! CheckExists $GCCBUILD/.configure-$1; then
+		# This will remove all files, but leave hidden ones
+		ExecuteCmd "rm -fr $GCCBUILD/*"
+		QuietExec "cd $BASEDIR/$GCCBUILD"
 
-			ExecuteCmd "../$GCCVER/configure $GCCBOPTS" "Configuring initial Gcc"
-			touch .configure
+		if [ "$1" == "Initial" ]; then
+			local OPTS=$GCCBOPTS
 		else
-			LogTitle "Gcc already configured"
+			OPTS=$GCCFOPTS
 		fi
+
+		ExecuteCmd "../$GCCVER/configure $OPTS" "Configuring $1 Gcc"
+		QuietExec "touch .configure-$1"
 	else
-		LogTitle "Final Gcc already configured, not configuring initial again"
+		LogTitle "Gcc $1 already configured"
 	fi
 
 	cd $BASEDIR
 }
 
 ###############################################################################
-# Build the base Gcc for building Newlib
+# Build Gcc
+# $1 valuse: "Initial" or "Final"
 ###############################################################################
-BuildBaseGcc()
+BuildGcc()
 {
-	LogTitle "Building initial Gcc"
+	LogTitle "Building $1 Gcc"
 
-	if ! CheckExists $GCCBUILD/.finalconfig; then
-		if ! CheckExists $GCCBUILD/.baseinstalled; then
-			cd $BASEDIR/$GCCBUILD
+	if ! CheckExists $GCCBUILD/.installed-$1; then
+		QuietExec "cd $BASEDIR/$GCCBUILD"
 
+		if [ "$1" == "Initial" ]; then
 			ExecuteCmd "$MAKE all-gcc"
-			ExecuteCmd "$MAKE install-gcc" "Building initial Gcc"
-			touch .baseinstalled
+			ExecuteCmd "$MAKE install-gcc" "Building $1 Gcc"
 		else
-			LogTitle "Initial Gcc already installed"
+			ExecuteCmd "$MAKE all"
+			ExecuteCmd "$MAKE install" "Building $1 Gcc"
 		fi
+		QuietExec "touch .installed-$1"
 	else
-		LogTitle "Final Gcc already configured, not building initial agian"
+		LogTitle "$1 Gcc already installed"
 	fi
-	
+
 	cd $BASEDIR
 }
 
 ###############################################################################
-# Configure newlib
+# Configure Newlib
 ###############################################################################
 ConfigureNewlib()
 {
@@ -127,64 +134,77 @@ ConfigureNewlib()
 
 	if ! CheckExists $NEWLIBBUILD/.configure; then
 		Remove $NEWLIBBUILD
-		cd $BASEDIR/$NEWLIBBUILD
+		QuietExec "cd $BASEDIR/$NEWLIBBUILD"
 
 		ExecuteCmd "../$NEWLIBVER/configure $NEWLIBOPTS" "Configuring Newlib"
-		touch .configure
+		QuietExec "touch .configure"
 	else
 		LogTitle "Newlib already configured"
 	fi
 
-	cd $BASEDIR
+	QuietExec "cd $BASEDIR"
 }
 
 ###############################################################################
-# Build and install newlib
+# Build and install Newlib
 ###############################################################################
 BuildNewlib()
 {
 	LogTitle "Building Newlib"
 	if ! CheckExists $NEWLIBBUILD/.installed; then
-		cd $BASEDIR/$NEWLIBBUILD
+		QuietExec "cd $BASEDIR/$NEWLIBBUILD"
 
 		ExecuteCmd "$MAKE"
 		ExecuteCmd "$MAKE install" "Building Newlib"
-		touch .installed
+
+		# SHELF is defined in Dreamcast.cfg
+		if [ "$SHELF" ]; then
+			if [ $THREADS == "posix" -o $THREADS == "yes" ]; then
+				# Make sure KOS is downloaded before trying to copy files from
+				# it
+				QuietExec "mkdir -p $KOSLOCATION"
+				Download kos
+				###############################################################
+				# This was taken from Jim Ursetto's Makefile script to set up
+				# some KOS stuff
+				###############################################################
+				# Only needed for the Dreamcast/kos
+				###############################################################
+				# I couldn't find any kind of license for this so below may
+				# not be covered under the license at the beginning of this
+				# file.
+				###############################################################
+				LogTitle "Symlinking KOS libraries..."
+				if [ $(echo $GCCVER | cut -b5) -le 3 ]; then
+					# KOS pthread.h is modified
+					ExecuteCmd "cp $KOSLOCATION/include/pthread.h $INSTALL/$TARG/include"
+					# to define _POSIX_THREADS
+					ExecuteCmd "cp $KOSLOCATION/include/sys/_pthread.h $INSTALL/$TARG/include/sys"
+					# pthreads to kthreads mapping
+					ExecuteCmd "cp $KOSLOCATION/include/sys/sched.h $INSTALL/$TARG/include/sys"
+				else
+					if [ -e "$PATCHDIR/$NEWLIBVER-_pthread.h" ]; then
+						ExecuteCmd "cp $PATCHDIR/$NEWLIBVER-_pthread.h $INSTALL/$TARG/include/sys/_pthread.h"
+					fi
+					if [ -e "$PATCHDIR/$NEWLIBVER-_types.h" ]; then
+						ExecuteCmd "cp $PATCHDIR/$NEWLIBVER-_types.h $INSTALL/$TARG/include/sys/_types.h"
+					fi
+				fi
+				# so KOS includes are available as kos/file.h
+				ExecuteCmd "ln -nsf $KOSLOCATION/include/kos $INSTALL/$TARG/include"
+				# kos/thread.h requires arch/arch.h
+				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/arch $INSTALL/$TARG/include"
+				# arch/arch.h requires dc/video.h
+				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/dc $INSTALL/$TARG/include"
+			fi
+		fi
+
+		QuietExec "touch .installed"
 	else
 		LogTitle "Newlib already installed"
 	fi
 
-	cd $BASEDIR
-
-	# SHELF is defined in Dreamcast.cfg
-	if [ "$TARG" == "$SHELF" -a $THREADS == "posix" -o $THREADS == "yes" ]; then
-		# Make sure KOS is downloaded before trying to copy files from
-		# it
-		Download kos
-		###############################################################
-		# This was taken from Jim Ursetto's Makefile script to set up
-		# some KOS stuff
-		###############################################################
-		# Only needed for the Dreamcast/kos
-		###############################################################
-		# I couldn't find any kind of license for this so below may
-		# not be covered under the license at the beginning of this
-		# file.
-		###############################################################
-		LogTitle "Fixing up SH4 Newlib includes..."
-		# KOS pthread.h is modified
-		ExecuteCmd "cp $KOSLOCATION/include/pthread.h $INSTALL/$TARG/include"
-		# to define _POSIX_THREADS
-		ExecuteCmd "cp $KOSLOCATION/include/sys/_pthread.h $INSTALL/$TARG/include/sys"
-		# pthreads to kthreads mapping
-		ExecuteCmd "cp $KOSLOCATION/include/sys/sched.h $INSTALL/$TARG/include/sys"
-		# so KOS includes are available as kos/file.h
-		ExecuteCmd "ln -nsf $KOSLOCATION/include/kos $INSTALL/$TARG/include"
-		# kos/thread.h requires arch/arch.h
-		ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/arch $INSTALL/$TARG/include"
-		# arch/arch.h requires dc/video.h
-		ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/dc $INSTALL/$TARG/include"
-	fi
+	QuietExec "cd $BASEDIR"
 }
 
 ###############################################################################
@@ -197,45 +217,50 @@ ConfigureuClibc()
 	UntarPatch $KERNELVER $KERNELPATCH
 
 	if ! CheckExists $UCLIBCDIR/.configure; then
-		cd $TARG/$KERNELVER/include
+		QuietExec "cd $TARG/$KERNELVER"
 
-		# Make sure we link to the correct asm for the target
-		case $TARG in
-			"$DCLTARG")
-				ExecuteCmd "rm -f asm"
-				ExecuteCmd "ln -s asm-sh asm"
-				;;
-			"$GCLTARG")
-				ExecuteCmd "rm -f asm"
-				ExecuteCmd "ln -s asm-ppc asm"
-				;;
-			*)
-				LogFatal "You shouldn't try building uClibc without a known target"
-				;;
-		esac
+		if [ $(echo $KERNELVER | grep libc) ]; then
+			# If it's the old headers, we we'll cd to include
+			QuietExec "cd include"
 
-		cd $BASEDIR 
+			# Make sure we link to the correct asm for the target
+			case $TARG in
+				"$DCLTARG" | "$SH2TARG")
+					QuietExec "rm -f asm"
+					QuietExec "ln -s asm-sh asm"
+					;;
+				"$GCLTARG")
+					QuietExec "rm -f asm"
+					QuietExec "ln -s asm-ppc asm"
+					;;
+				*)
+					LogFatal "You shouldn't try building uClibc without a known target"
+					;;
+			esac
+		else
+			# isn't this so much nicer?
+			ExecuteCmd "make ARCH=$GENERICTARG CROSS_COMPILE=$TARG- INSTALL_HDR_PATH=$SYSROOT/usr headers_install"
+		fi
 
-		ExecuteCmd "mkdir -p $UCLIBCHDIR/usr/include"
-		ExecuteCmd "mkdir -p $UCLIBCHDIR/usr/lib"
-		ExecuteCmd "mkdir -p $UCLIBCHDIR/lib"
+		QuietExec "cd $BASEDIR"
 
-		cd $BASEDIR/$UCLIBCDIR
+		Debug $UCLIBCHDIR
+		Debug $SYSROOT
+		QuietExec "mkdir -p $UCLIBCHDIR/usr/include"
+		QuietExec "mkdir -p $UCLIBCHDIR/usr/lib"
+		QuietExec "mkdir -p $UCLIBCHDIR/lib"
 
-		# We just need to copy the configuration file to this 
-		# directory and sed out a few things.
-		BASELINE=$(echo "$BASEDIR/$TARG" | sed s/\\\//\\\\\\//g)
-		UCLIBCLINE=$(echo "$UCLIBCHDIR" | sed s/\\\//\\\\\\//g)
+		QuietExec "cd $BASEDIR/$UCLIBCDIR"
 
-		sed "s/KERNELSOURCEDIR/$BASELINE\/$KERNELVER/" $PATCHDIR/uclibc-config | sed "s/COMPILERPREFIX/$TARG-/" | sed "s/SHAREDLIBPREFIX/$UCLIBCLINE\//" |  sed "s/RUNDEVPREFIX/$UCLIBCLINE\/usr/" > .config
+		sed -e "s,KERNELSOURCEDIR,$SYSROOT/usr/include," -e "s,COMPILERPREFIX,$TARG-," -e "s,SHAREDLIBPREFIX,$UCLIBCHDIR," -e "s,RUNDEVPREFIX,$UCLIBCHDIR/usr," $PATCHDIR/$UCLIBCVER-config > .config
 
-		ExecuteCmd "make PREFIX=$UCLIBCHDIR DEVEL_PREFIX=/usr/ RUNTIME_PREFIX=$UCLIBCHDIR pregen install_dev" 
-		touch .configure
+		ExecuteCmd "make PREFIX=$UCLIBCHDIR DEVEL_PREFIX=/usr/ RUNTIME_PREFIX=$UCLIBCHDIR pregen install_dev"
+		QuietExec "touch .configure"
 	else
 		LogTitle "uClibc already configured"
 	fi
 
-	cd $BASEDIR
+	QuietExec "cd $BASEDIR"
 }
 
 ###############################################################################
@@ -245,24 +270,22 @@ BuilduClibc()
 {
 	LogTitle "Building uClibc"
 	if ! CheckExists $UCLIBCDIR/.installed; then
-		cd $BASEDIR/$UCLIBCDIR
+		QuietExec "cd $BASEDIR/$UCLIBCDIR"
 
 		ExecuteCmd "$MAKE"
 		ExecuteCmd "$MAKE install" "Building uClibc"
 		# Ok, building went ok, so install the libs and includes
-	        # to the right prefix
+		# to the right prefix
 		ExecuteCmd "cp -r $UCLIBCHDIR/usr/include $INSTALL"
 		ExecuteCmd "cp -r $UCLIBCHDIR/usr/lib/* $INSTALL/lib"
 		cd $INSTALL/$TARG
 		ExecuteCmd "ln -snf ../include sys-include"
 		ExecuteCmd "ln -snf ../include include"
-		ls -lh lib
-		# Not sure if this is needed, lib might be empty at this point already
-		for i in `find lib | sed "s/lib//i"`; do ExecuteCmd "mv lib/$i ../lib"; done
+		ExecuteCmd "cp -r lib/* ../lib"
 		ExecuteCmd "rm -fr lib"
 		ExecuteCmd "ln -snf ../lib lib"
 		cd -
-		touch .installed
+		QuietExec "touch .installed"
 	else
 		LogOutput "uClibc already installed"
 	fi
@@ -271,43 +294,97 @@ BuilduClibc()
 }
 
 ###############################################################################
-# Configure the final Gcc for you to use
+# Configure Glibc
+# $1 values: "Headers" or "Final"
 ###############################################################################
-ConfigureFinalGcc()
+ConfigureGlibc()
 {
-	LogTitle "Configuring final Gcc"
-	UntarPatch $GCCVER $GCCPATCH
+	LogTitle "Configuring Glibc $1"
+	UntarPatch $GLIBCVER $GLIBCPATCH
+	UntarPatch $KERNELVER $KERNELPATCH
+	QuietExec "mkdir -p $GLIBCDIR"
 
-	if ! CheckExists $GCCBUILD/.finalconfig; then
-		# I don't like seeing "(reconfigured)" from Gcc
-		Remove $GCCBUILD
-	
-		cd $BASEDIR/$GCCBUILD
+	if ! CheckExists $GLIBCDIR/.configure-$1; then
+		QuietExec "cd $BASEDIR/$GCLIBCDIR"
+		if [ "$1" == "Headers" ]; then
+			# Prepare the linux headers
+			QuietExec "cd $BASEDIR/$TARG/$KERNELVER"
+			if [ $(echo $KERNELVER | grep libc) ]; then
+				ExecuteCmd "cp -r include/linux $HEADERSDIR"
+				#ExecuteCmd "cp -r include/asm-generic $HEADERSDIR/asm-generic"
+				ExecuteCmd "cp -r include/asm-$GENERICTARG $HEADERSDIR/asm"
+			else
+				ExecuteCmd "make ARCH=$GENERICTARG CROSS_COMPILE=$TARG- INSTALL_HDR_PATH=$SYSROOT/usr headers_install"
+			fi
 
-		ExecuteCmd "../$GCCVER/configure $GCCFOPTS" "Configuring final Gcc"
-		touch .finalconfig
+			# Now get the Glibc headers installed
+			QuietExec "cd $BASEDIR/$GLIBCDIR"
+
+			CC=gcc ExecuteCmd "../$GLIBCVER/configure $GLIBCHOPTS" "Configuring Glibc Headers" 
+			ExecuteCmd "$MAKE cross-compiling=yes install_root=$SYSROOT install-headers" "Installing Glibc Headers"
+
+			# Taken/adapted from CrossTool
+			# Two headers -- stubs.h and features.h -- aren't installed by install-headers,
+			# so do them by hand.  We can tolerate an empty stubs.h for the moment.
+			# See e.g. http://gcc.gnu.org/ml/gcc/2002-01/msg00900.html
+			QuietExec "mkdir -p $HEADERSDIR/gnu"
+			QuietExec "touch $HEADERSDIR/gnu/stubs.h"
+			QuietExec "cp ../$GLIBCVER/include/features.h $HEADERSDIR/features.h"
+			# End stuff from CrossTool
+			# Hmm, bits/stdio_lim.h doesn't seem to be getting installed, simple fix, copy it to the correct location
+			# seems $HEADERSDIR/bits may not be created by default, so make sure it's there
+			QuietExec "mkdir -p $HEADERSDIR/bits"
+			QuietExec "cp bits/stdio_lim.h $HEADERSDIR/bits/stdio_lim.h"
+
+		else
+			QuietExec "cd $BASEDIR/$GLIBCDIR"
+			# Remove contents that may be in there after initial configure/make"
+			QuietExec "rm -fr *"
+
+			# Taken/adapted from CrossTool
+			# For glibc 2.3.4 and later we need to set some autoconf cache
+			# variables, because nptl/sysdeps/pthread/configure.in does not
+			# work when cross-compiling.
+			libc_cv_forced_unwind=yes
+			libc_cv_c_cleanup=yes
+			export libc_cv_forced_unwind libc_cv_c_cleanup
+
+			# Setting the pre-configure options adapted from CrossTool
+			BUILD_CC=gcc CC=$TARG-gcc AR=$TARG-ar RANLIB=$TARG-ranlib ExecuteCmd "../$GLIBCVER/configure $GLIBCFOPTS"
+
+			Result "Configuring Glibc"
+		fi
+		QuietExec "touch .configure-$1"
 	else
-		LogTitle "Gcc Already configured"
+		LogTitle "Glibc already configured"
 	fi
 
-	cd $BASEDIR
+	QuietExec "cd $BASEDIR"
 }
 
 ###############################################################################
-# Build the final Gcc for you to use
+# Build and install Glibc
+# $1 values: "Initial" or "Final" though, anything other than "Initial" works
 ###############################################################################
-BuildFinalGcc()
+BuildGlibc()
 {
-	LogTitle "Building final Gcc"
-	
-	if ! CheckExists $GCCBUILD/.finalinstalled; then
-		cd $BASEDIR/$GCCBUILD
+	LogTitle "Building Glibc $1"
+	if ! CheckExists $GLIBCDIR/.installed-$1; then
+		QuietExec "cd $BASEDIR/$GLIBCDIR"
 
-		ExecuteCmd "$MAKE all"
-		ExecuteCmd "$MAKE install" "Building final Gcc"
-		touch .finalinstalled
+		if [ "$1" == "Initial" ]; then
+			ExecuteCmd "$MAKE LD=$TARG-ld RANLIB=$TARG-ranlib lib"
+			# install-lib-all is defined in patched version of the Makefile only
+			ExecuteCmd "$MAKE install_root=$SYSROOT install-lib-all install-headers"
+
+		else
+			ExecuteCmd "$MAKE LD=$TARG-ld RANLIB=$TARG-ranlib"
+			ExecuteCmd "$MAKE install_root=$SYSROOT install-bin install-rootsbin install-sbin install-data install-others"
+		fi
+
+		QuietExec "touch .installed-$1"
 	else
-		LogTitle "Final Gcc already installed"
+		LogOutput "Glibc $1 already installed"
 	fi
 
 	cd $BASEDIR
@@ -321,107 +398,91 @@ BuildKos()
 	LogTitle "Building Kos"
 	Download kos
 
-	cd $KOSLOCATION
+	QuietExec "cd $KOSLOCATION"
 
 	#######################################################################
 	# This is to setup the environ.sh to what our compiler is
 	#######################################################################
-	ExecuteCmd "cp doc/environ.sh.sample environ.sh"
+	QuietExec "cp doc/environ.sh.sample environ.sh"
 
 	# Change KOS_BASE to point to where our Kos is located
-	# I do this by finding the line in the file with grep
-	# Then seding the quotes to have a \ in front
-	KOSBASELINE=$(grep "^export KOS_BASE\=" environ.sh | sed s/\"/\\\\\"/g)
-	
-	# After that I replace each / with a \/ so sed does't get confused
-	KOSBASELINE=$(echo "$KOSBASELINE" | sed s/\\\//\\\\\\//g)
+	KOSBASELINE=$(grep -n "^export KOS_BASE\=" environ.sh | cut -f1 -d:)
 
-	# KOSLOC has the location of kos formatted for sed to read
-	KOSLOC=`echo $KOSLOCATION | sed s/\\\//\\\\\\\\\\\//g`
+	# Then I replace the old line with the new one
+	sed -e "$KOSBASELINE c export KOS_BASE=\"$KOSLOCATION\"" -i environ.sh
+	# Instead of being overly paranoid, we'll just use one Result to make
+	# sure we got the environ.sh copied correctly.
+	Result "sed -e \"$KOSBASELINE c export KOS_BASE=\"$KOSLOCATION\"\" -i environ.sh"
+	LogOutput "Changed KOS_BASE with $KOSLOCATION"
 
-	# Then I replace the old line with the  new one
-	sed "s/$KOSBASELINE/export KOS_BASE=\"$KOSLOC\"/" environ.sh > temp
-
-	# Then move the output from that back to envorin.sh
-	ExecuteCmd "mv temp environ.sh" "Changed KOS_BASE with $KOSLOC"
-
-	COMPLOC=`echo $INSTALL | sed s/\\\//\\\\\\\\\\\//g`
 	if [ "$TARG" == "$SHELF" -o "$TARG" == "$ARMELF" ]; then
 		# Same as above for DC_ARM_BASE, but we use where the compiler is
 		# installed instead
-		ARMBASELINE=$(grep "^export DC_ARM_BASE\=" environ.sh | sed s/\"/\\\\\"/g)
-		ARMBASELINE=$(echo "$ARMBASELINE" | sed s/\\\//\\\\\\//g)
-		sed "s/$ARMBASELINE/export DC_ARM_BASE=\"$COMPLOC\"/" environ.sh > temp
-		ExecuteCmd "mv temp environ.sh" "Changed DC_ARM_BASE with $ARMBASELINE"
-		
+		ARMBASELINE=$(grep -n "^export DC_ARM_BASE\=" environ.sh | cut -f1 -d:)
+		sed -e "$ARMBASELINE c export DC_ARM_BASE=\"$INSTALL\"" -i environ.sh
+		LogOutput "Changed DC_ARM_BASE with $INSTALL"
+
 		# Same as above for DC_ARM_BASE, but we use where the compiler is
 		# installed instead
-		ARMPREFIXLINE=$(grep "^export DC_ARM_PREFIX\=" environ.sh | sed s/\"/\\\\\"/g)
-		ARMPREFIXLINE=$(echo "$ARMPREFIXLINE" | sed s/\\\//\\\\\\//g)
-		sed "s/$ARMPREFIXLINE/export DC_ARM_PREFIX=\"$ARMELF\"/" environ.sh > temp
-		ExecuteCmd "mv temp environ.sh" "Changed DC_ARM_PREFIX with $ARMPREFIXLINE"
+		ARMPREFIXLINE=$(grep -n "^export DC_ARM_PREFIX\=" environ.sh | cut -f1 -d:)
+		sed -e "$ARMPREFIXLINE c export DC_ARM_PREFIX=\"$ARMELF\"" -i environ.sh
+		LogOutput "Changed DC_ARM_PREFIX with $ARMELF"
 
 		# Needed because we can't just use $SHELF for the cc prefix anymore
 		THISTARG=$SHELF
 	else
 		# if the arch isn't Dreamcast, it's ia32
-		ARCHBASELINE=$(grep "^export KOS_ARCH=\"dreamcast\"" environ.sh)
-		sed "s/$ARCHBASELINE/export KOS_ARCH=\"ia32\"/" environ.sh > temp
-		ExecuteCmd "mv temp environ.sh" "Changed KOS_ARCH to $ARCHBASELINE"
+		ARCHBASELINE=$(grep -n "^export KOS_ARCH=\"dreamcast\"" environ.sh)
+		sed -e "$ARCHBASELINE c export KOS_ARCH=\"ia32\"" -i environ.sh
+		LogOutput "Changed KOS_ARCH to $ARCHBASELINE"
 
-		# Comment these two out if it's not the dreamcast compiler
-		ARMBASELINE=$(grep "^export DC_ARM_BASE\=" environ.sh | sed s/\"/\\\\\"/g)
-		ARMBASELINE=$(echo "$ARMBASELINE" | sed s/\\\//\\\\\\//g)
-		sed "s/$ARMBASELINE/#export DC_ARM_BASE=/" environ.sh > temp
-		ExecuteCmd "mv temp environ.sh" "Changed DC_ARM_BASE to $ARMBASELINE"
-		
-		ARMPREFIXLINE=$(grep "^export DC_ARM_PREFIX\=" environ.sh | sed s/\"/\\\\\"/g)
-		ARMPREFIXLINE=$(echo "$ARMPREFIXLINE" | sed s/\\\//\\\\\\//g)
-		sed "s/$ARMPREFIXLINE/#export DC_ARM_PREFIX=/" environ.sh > temp
-		ExecuteCmd "mv temp environ.sh" "Changed DC_ARM_PREFIX to $ARMPREFIXLINE"
+		# Comment these two out if its not the dreamcast compiler
+		ARMBASELINE=$(grep -n "^export DC_ARM_BASE\=" environ.sh | cut -f1 -d:)
+		sed -e "$ARMBASELINE c #export DC_ARM_BASE=" -i environ.sh
+		LogOutput "Changed DC_ARM_BASE to $ARMBASELINE"
+
+		ARMPREFIXLINE=$(grep -n "^export DC_ARM_PREFIX\=" environ.sh | cut -f1 -d:)
+		sed -e "$ARMPREFIXLINE c #export DC_ARM_PREFIX=" -i environ.sh
+		LogOutput "Changed DC_ARM_PREFIX to $ARMPREFIXLINE"
 
 		THISTARG=$TARG
 	fi
-	
+
 	# Same as above but for KOS_CC_BASE
-	KOSCCBASELINE=$(grep "^export KOS_CC_BASE\=" environ.sh | sed s/\"/\\\\\"/g)
-	KOSCCBASELINE=$(echo $KOSCCBASELINE | sed s/\\\//\\\\\\//g)
-	sed "s/$KOSCCBASELINE/export KOS_CC_BASE=\"$COMPLOC\"/g" environ.sh > temp
-	ExecuteCmd "mv temp environ.sh" "Changed KOS_CC_BASE to $KOSCCBASELINE"
+	KOSCCBASELINE=$(grep -n '^export KOS_CC_BASE=' environ.sh | cut -f1 -d:)
+	sed -e "$KOSCCBASELINE c export KOS_CC_BASE=\"$INSTALL\"" -i environ.sh
+	LogOutput "Changed KOS_CC_BASE to $KINSTALL"
 
 	# Change the standard dc to our prefix
-	KOSCCPREFIXLINE=$(grep "^export KOS_CC_PREFIX=" environ.sh | sed s/\"/\\\\\"/g)
-	KOSCCPREFIXLINE=$(echo $KOSCCPREFIXLINE | sed s/\\\//\\\\\\//g)
-	sed "s/$KOSCCPREFIXLINE/export KOS_CC_PREFIX=\"$THISTARG\"/g" environ.sh > temp
-	ExecuteCmd "mv temp environ.sh" "Changed KOS_CC_PREFIX to $KOSCCPREFIXLINE"
+	KOSCCPREFIXLINE=$(grep -n "^export KOS_CC_PREFIX=" environ.sh | cut -f1 -d:)
+	sed -e "$KOSCCPREFIXLINE c export KOS_CC_PREFIX=\"$THISTARG\"" -i environ.sh
+	LogOutput "Changed KOS_CC_PREFIX to $THISTARG"
 
 	# Change the PATH expansion line
-	KOSPATHLINE=$(grep "^export PATH=" environ.sh | sed s/\"/\\\\\"/g)
-	KOSPATHLINE=$(echo $KOSPATHLINE | sed s/\\\//\\\\\\//g)
+	KOSPATHLINE=$(grep -n "^export PATH=" environ.sh | cut -f1 -d:)
 	# The sample uses ${KOS_CC_BASE}/bin:/usr/local/dc/bin which means on a standard
 	# install it's going to be the same
-	sed "s/$KOSPATHLINE/export PATH=\"\${PATH}:\${KOS_CC_BASE}\/bin\"/" environ.sh > temp
-	ExecuteCmd "mv temp environ.sh" "Changed PATH to $KOSPATHLINE"
+	sed -e "$KOSPATHLINE c export PATH=\"\${PATH}:\${KOS_CC_BASE}/bin\"" -i environ.sh
+	LogOutput "Changed PATH to \${PATH}:\${KOS_CC_BASE}/bin\""
 
 	# Change the MAKE variable to match the one here
-	KOSMAKELINE=$(grep "^export KOS_MAKE=" environ.sh | sed s/\"/\\\\\"/g)
-	KOSMAKELINE=$(echo $KOSMAKELINE  | sed s/\\\//\\\\\\//g)
-	sed "s/$KOSMAKELINE/export KOS_MAKE=\"$MAKE\"/" environ.sh > temp
-	ExecuteCmd "mv temp environ.sh" "Changed KOS_MAKE to $KOSMAKELINE"
+	KOSMAKELINE=$(grep -n "^export KOS_MAKE=" environ.sh | cut -f1 -d:)
+	sed -e "$KOSMAKELINE c export KOS_MAKE=\"$MAKE\"" -i environ.sh
+	LogOutput "Changed KOS_MAKE to $MAKE"
 	#######################################################################
 
 	# Set environ.sh variables to use
 	source environ.sh
-	
+
 	Patch kos $KOSPATCH
-	cd $KOSLOCATION
+	QuietExec "cd $KOSLOCATION"
 	# make kos
 	ExecuteCmd "$MAKE clean"
 	ExecuteCmd "$MAKE" "Building Kos"
 
 	Patch kos-ports $KOSPORTSPATCH
 	# make kos-ports
-	cd $KOSLOCATION/../kos-ports
+	QuietExec "cd $KOSLOCATION/../kos-ports"
 	ExecuteCmd "$MAKE clean"
 	ExecuteCmd "$MAKE" "Building Kos ports"
 }
@@ -434,12 +495,12 @@ All()
 	LogTitle "Making complete compiler"
 	ConfigureBin
 	BuildBin
-	ConfigureBaseGcc
-	BuildBaseGcc
+	ConfigureGcc "Initial"
+	BuildGcc "Initial"
 	ConfigureNewlib
 	BuildNewlib
-	ConfigureFinalGcc
-	BuildFinalGcc
+	ConfigureGcc "Final"
+	BuildGcc "Final"
 }
 
 ###############################################################################
@@ -451,19 +512,19 @@ CleaningAll()
 	ConfigureBin
 	BuildBin
 	CleaningRemove $BINBUILD
-	ExecuteCmd "rm -fr $BASEDIR/$TARG/$BINVER"
-	ConfigureBaseGcc
-	BuildBaseGcc
+	QuietExec "rm -fr $BASEDIR/$TARG/$BINVER"
+	ConfigureGcc "Initial"
+	BuildGcc "Initial"
 	CleaningRemove $GCCBUILD
-	ExecuteCmd "rm -fr $BASEDIR/$TARG/$GCCVER"
+	QuietExec "rm -fr $BASEDIR/$TARG/$GCCVER"
 	ConfigureNewlib
 	BuildNewlib
 	CleaningRemove $NEWLIBBUILD
-	ExecuteCmd "rm -fr $BASEDIR/$TARG/$NEWLIBVER"
-	ConfigureFinalGcc
-	BuildFinalGcc
+	QuietExec "rm -fr $BASEDIR/$TARG/$NEWLIBVER"
+	ConfigureGcc "Final"
+	BuildGcc "Final"
 	CleaningRemove $GCCBUILD
-	ExecuteCmd "rm -fr $BASEDIR/$TARG/$GCCVER"
+	QuietExec "rm -fr $BASEDIR/$TARG/$GCCVER"
 }
 
 ###############################################################################
@@ -471,7 +532,7 @@ CleaningAll()
 ###############################################################################
 BuildDreamcast()
 {
-	# Make sure we're in the right target	
+	# Make sure we're in the right target
 	SetOptions Dreamcast
 
 	All
@@ -479,12 +540,14 @@ BuildDreamcast()
 
 	# The default is to do a single pass without Newlib for target (arm)
 	if [ $TWOPASS -eq 1 ]; then
+		LogTitle "Making two pass Arm compiler for Dreamcast"
 		All
 	else
+		LogTitle "Making single pass Arm compiler for Dreamcast"
 		ConfigureBin
 		BuildBin
-		ConfigureBaseGcc
-		BuildBaseGcc
+		ConfigureGcc "Initial"
+		BuildGcc "Initial"
 	fi
 
 	BuildKos
@@ -495,7 +558,7 @@ BuildDreamcast()
 ###############################################################################
 BuildCleaningDreamcast()
 {
-	# Make sure we're in the right target	
+	# Make sure we're in the right target
 	SetOptions Dreamcast
 
 	CleaningAll
@@ -508,11 +571,11 @@ BuildCleaningDreamcast()
 		ConfigureBin
 		BuildBin
 		CleaningRemove $BINBUILD
-		ExecuteCmd "rm -fr $BASEDIR/$TARG/$BINVER"
-		ConfigureBaseGcc
-		BuildBaseGcc
+		QuietExec "rm -fr $BASEDIR/$TARG/$BINVER"
+		ConfigureGcc "Initial"
+		BuildGcc "Initial"
 		CleaningRemove $GCCBUILD
-		ExecuteCmd "rm -fr $BASEDIR/$TARG/$GCCVER"
+		QuietExec "rm -fr $BASEDIR/$TARG/$GCCVER"
 	fi
 
 	BuildKos
@@ -520,22 +583,62 @@ BuildCleaningDreamcast()
 
 ###############################################################################
 # Build the Linux compiler
+# $1: The system type we're building for
 ###############################################################################
 BuildLinux()
 {
-	LogTitle "Making complete $1 Linux compiler"
-	# Make sure we're using the right target	
-	SetOptions $1
+	if [ "$1" ]; then
+		LogTitle "Making complete $1 Linux compiler"
+		# Make sure we're using the right target
+		SetOptions $1
+	else
+		LogTitle "Making complete $TARG Linux compiler"
+	fi
+
+	# We firstly need Binutils
 	ConfigureBin
 	BuildBin
-	# uClibc needs to be configured before Gcc
-	ConfigureuClibc
-	ConfigureBaseGcc
-	BuildBaseGcc
-	ConfigureuClibc
-	BuilduClibc
-	ConfigureFinalGcc
-	BuildFinalGcc
-	ExecuteCmd "rm -fr $INSTALL/$TARG/sys-include"
+
+	# uClibc is a bit more straight forward
+	if [ "$USEUCLIBC" ]; then
+		# uClibc needs to be configured before Gcc so Gcc has the
+		# headers
+		ConfigureuClibc
+	else
+		# Here we just install the headers for Gcc
+		ConfigureGlibc "Headers"
+	fi
+
+	if [ ! "$NATIVECOMPILER" ]; then
+		# Initial Gcc using the above headers
+		ConfigureGcc "Initial"
+		BuildGcc "Initial"
+	fi
+
+	if [  "$USEUCLIBC" -a ! "$NATIVECOMPILER" ]; then
+		# After the initial Gcc build, we can build the full uClibc
+		ConfigureuClibc
+		BuilduClibc
+	else
+		# This looks weird, but we set up the inital Glibc and it
+		# installs the headers in "Initial" so Final is used to
+		# Build both Initial and Final Glibc
+		ConfigureGlibc "Final"
+		# This just builds the libs of Glibc to be used with Gcc
+		BuildGlibc "Initial"
+	fi
+
+	# Build the Gcc that uses the libs from Glibc or uClibc
+	ConfigureGcc "Final"
+	BuildGcc "Final"
+
+	if [ ! "$USEUCLIBC" -a ! "$NATIVECOMPILER" ]; then
+		# Glibc has some extra things that are built now with
+		# the bootstrapped compiler
+		BuildGlibc "Final"
+	fi
+
+	# We don't need sys-include now
+	QuietExec "rm -fr $INSTALL/$TARG/sys-include"
 }
 

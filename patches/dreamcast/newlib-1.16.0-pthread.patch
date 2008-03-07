@@ -1,0 +1,28 @@
+diff -urN newlib-1.16.0.orig/newlib/libc/include/pthread.h newlib-1.16.0/newlib/libc/include/pthread.h
+--- newlib-1.16.0.orig/newlib/libc/include/pthread.h	2006-09-13 17:09:27.000000000 -0500
++++ newlib-1.16.0/newlib/libc/include/pthread.h	2008-01-18 16:16:17.000000000 -0600
+@@ -25,6 +25,7 @@
+ extern "C" {
+ #endif
+ 
++#include <sys/_pthread.h>
+ #include <unistd.h>
+ 
+ #if defined(_POSIX_THREADS)
+@@ -45,7 +46,7 @@
+     NOTE: RTEMS does not provide pthread_atfork().  */
+ 
+ #if !defined(__rtems__)
+-#warning "Add pthread_atfork() prototype"
++//#warning "Add pthread_atfork() prototype"
+ #endif
+ 
+ /* Mutex Initialization Attributes, P1003.1c/Draft 10, p. 81 */
+@@ -56,6 +57,7 @@
+ 		(_CONST pthread_mutexattr_t *__attr, int  *__pshared));
+ int	_EXFUN(pthread_mutexattr_setpshared,
+ 		(pthread_mutexattr_t *__attr, int __pshared));
++int _EXFUN(pthread_mutexattr_settype, (pthread_mutexattr_t *attr, int type));
+ 
+ /* Initializing and Destroying a Mutex, P1003.1c/Draft 10, p. 87 */
+ 

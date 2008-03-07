@@ -1,9 +1,8 @@
+#!/bin/sh
 ###############################################################################
-# Copyright 2000-2006
+# Copyright 2000-2007
 #         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
 #         All rights reserved.
-###############################################################################
-#!/bin/bash
 ###############################################################################
 # Used for checking things in the code. Used with silent most the time so it's
 # easy to see debug messages.
@@ -14,7 +13,7 @@ Debug()
 }
 
 ###############################################################################
-# To shorten code, ExecuteCmd will redirect output if needed and execute 
+# To shorten code, ExecuteCmd will redirect output if needed and execute
 # Result after executing the command
 # Takes the form of ExecuteCmd "Commands to execute" "Message to display"
 # "Message to display" can be left off to display the command instead of the
@@ -48,15 +47,33 @@ ExecuteCmd()
 }
 
 ###############################################################################
+# Same as above but only LogErrors/Fatals and inlines Result
+###############################################################################
+QuietExec()
+{
+	if [ "$SILENT" -eq 0 ]; then
+		$1
+	else
+		$1 >> $SENDTOWHERE 2>> $ERRORTOWHERE
+	fi
+
+	if [ $? -ne 0 ]; then
+		LogError "$* $TEXTFAILED"
+		LogFatal "Failed to complete sucessfully. Exiting script."
+	fi
+}
+
+###############################################################################
 # See if a command like make exited cleanly
 ###############################################################################
 Result() 
 {
 	# I assume the programmers use 0 for success and other values for not
 	if [ $? -eq 0 ]; then
-		LogOutput "$* completed ok" 
+		LogOutput "$* $TEXTCOMPLETED"
 	else
-		LogFatal "$* failed to complete successfully. Exiting script."
+		LogError "$* $TEXTFAILED"
+		LogFatal "Failed to complete successfully. Exiting script."
 	fi
 }
 
@@ -109,15 +126,15 @@ LogFatal()
 CreateDir()
 {
 	if [ ! -d $BINBUILD ]; then
-		ExecuteCmd "mkdir -p $BINBUILD"
+		QuietExec "mkdir -p $BINBUILD"
 	fi
 
 	if [ ! -d $GCCBUILD ]; then
-		ExecuteCmd "mkdir -p $GCCBUILD"
+		QuietExec "mkdir -p $GCCBUILD"
 	fi
 
 	if [ ! -d $NEWLIBBUILD ]; then
-		ExecuteCmd "mkdir -p $NEWLIBBUILD"
+		QuietExec "mkdir -p $NEWLIBBUILD"
 	fi
 }
 
@@ -137,7 +154,7 @@ UntarPatch()
 	if [ ! -d $TARG/$1 -o ! -e $TARG/$1/.untared ]; then
 		Untar $1
 	fi
-	
+
 	# We send all parameters because the first is $1 and the rest
 	# are the patches, the format we want.
 	Patch $*
@@ -166,7 +183,7 @@ Untar()
 	fi
 
 	# A quick way to tell if we need to untar or not
-	touch $TARG/$1/.untared
+	QuietExec "touch $TARG/$1/.untared"
 }
 
 ###############################################################################
@@ -178,48 +195,69 @@ Download()
 		"$BINVER")
 			if ! CheckExists .$BINVER-downloaded || ! CheckExists $BINVER.tar.bz2 ; then
 				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/binutils/$BINVER.tar.bz2"
-				touch .$BINVER-downloaded
+				QuietExec "touch .$BINVER-downloaded"
 			fi
 			;;
 		"$GCCVER")
 			if ! CheckExists .$GCCVER-downloaded || ! CheckExists $GCCVER.tar.bz2; then
 				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/gcc/$GCCVER/$GCCVER.tar.bz2"
-				touch .$GCCVER-downloaded
+				QuietExec "touch .$GCCVER-downloaded"
 			fi
 			;;
 		"$NEWLIBVER")
 			if ! CheckExists .$NEWLIBVER-downloaded || ! CheckExists $NEWLIBVER.tar.gz; then
 				ExecuteCmd "wget -c ftp://sources.redhat.com/pub/newlib/$NEWLIBVER.tar.gz"
-				touch .$NEWLIBVER-downloaded
+				QuietExec "touch .$NEWLIBVER-downloaded"
 			fi
 			;;
 		"$UCLIBCVER")
 			if ! CheckExists .$UCLIBCVER-downloaded || ! CheckExists $UCLIBCVER.tar.bz2; then
-				ExecuteCmd "wget -c http://uclibc.org/downloads/$UCLIBCVER.tar.bz2"
-				touch .$UCLIBCVER-downloaded
+				if [ $(echo $UCLIBCVER | grep snapshot) ]; then
+					ExecuteCmd "wget -c http://uclibc.org/downloads/snapshots/$UCLIBCVER.tar.bz2"
+				elif [ $(echo $UCLIBCVER | grep "\." ) ]; then
+					ExecuteCmd "wget -c http://uclibc.org/downloads/$UCLIBCVER.tar.bz2"
+				else
+					QuietExec "cd $TARG"
+					ExecuteCmd "svn co svn://uclibc.org/trunk/uClibc"
+					QuietExec "cd .."
+				fi
+				QuietExec "touch .$UCLIBCVER-downloaded"
+			fi
+			;;
+		"$GLIBCVER")
+			if ! CheckExists .$GLIBCVER-downloaded || ! CheckExists $GLIBCVER.tar.bz2; then
+				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/glibc/$GLIBCVER.tar.bz2"
+				QuietExec "touch .$GLIBCVER-downloaded"
 			fi
 			;;
 		"$KERNELVER")
 			if ! CheckExists .$KERNELVER-downloaded || ! CheckExists $KERNELVER.tar.bz2; then
-				ExecuteCmd "wget -c http://ep09.pld-linux.org/~mmazur/linux-libc-headers/$KERNELVER.tar.bz2"
-				touch .$KERNELVER-downloaded
+				if [ $(echo $KERNELVER | grep libc) ]; then
+					ExecuteCmd "wget -c http://ep09.pld-linux.org/~mmazur/linux-libc-headers/$KERNELVER.tar.bz2"
+				else
+					ExecuteCmd "wget -c http://www.kernel.org/pub/linux/kernel/v2.6/$KERNELVER.tar.bz2"
+				fi
+				QuietExec "touch .$KERNELVER-downloaded"
 			fi
 			;;
 		"kos")
-			if ! CheckExists $KOSLOCATION/.kos-downloaded || ! -d $KOSLOCATION; then
-				cd $KOSLOCATION/..
-				ExecuteCmd "svn co https://svn.sourceforge.net/svnroot/cadcdev/kos"
-				touch .kos-downloaded
+			if ! CheckExists $KOSLOCATION/.kos-downloaded || ! test -d $KOSLOCATION; then
+				QuietExec "cd $KOSLOCATION/.."
+				ExecuteCmd "svn co https://cadcdev.svn.sourceforge.net/svnroot/cadcdev/kos"
+				QuietExec "touch .kos-downloaded"
 			fi
-			if ! CheckExists $KOSLOCATION/.kos-ports-downloaded || ! -d $KOSLOCATION/../kos-ports; then
-				cd $KOSLOCATION/..
-				ExecuteCmd "svn co https://svn.sourceforge.net/svnroot/cadcdev/kos-ports"
-				touch .kos-ports-downloaded
+			if ! CheckExists $KOSLOCATION/../kos-ports/.kos-ports-downloaded || ! test -d $KOSLOCATION/../kos-ports; then
+				QuietExec "cd $KOSLOCATION/.."
+				ExecuteCmd "svn co https://cadcdev.svn.sourceforge.net/svnroot/cadcdev/kos-ports"
+				QuietExec "touch .kos-ports-downloaded"
 			fi
-			cd $BASEDIR
+			QuietExec "cd $BASEDIR"
+			;;
+		*)
+			LogFatal "Script problem, contact maintainer to fix ;-)"
 			;;
 	esac
-}	
+}
 
 ###############################################################################
 # Try to patch the file
@@ -238,24 +276,20 @@ Patch()
 	# We need to get past the name/version so shift the params one
 	shift 1
 
-	if ! CheckExists $LOC/.patched; then 
-		cd $LOC
+	if ! CheckExists $LOC/.patched; then
+		QuietExec "cd $LOC"
 		# Go through all parameters passed here which is
 		# $(ls patches/sys/namever-*)
 		for i in $*; do
-			# Only patch if the "if" does not include disabled or
-			# broken
-			#
-			# This looks strange at first, but if grep doesn't
-			# include the word, it returns nothing, thus
-			# 'x`grep ...` == "x"' if the words aren't there.
-			if [[ x`echo $i | grep -i disabled` == "x" && x`echo $i | grep -i broken` == "x" ]]; then
+			# Only patch if the "if" includes a *.patch or a *.diff
+			if [ "`echo $i | grep -i '\.patch' | grep -v DISABLED`" -o \
+					"`echo $i | grep -i '\.diff' | grep -v DISABLED`" ]; then
 				ExecuteCmd "patch -p1 -i $i"
 			fi
 		done
 
-		touch .patched
-		cd $BASEDIR
+		QuietExec "touch .patched"
+		QuietExec "cd $BASEDIR"
 	fi
 }
 
@@ -264,6 +298,7 @@ Patch()
 ###############################################################################
 Remove()
 {
+	CheckSystem
 	LogOutput "Removing contents of $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*"
 	ExecuteCmd "rm -fr $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*" "Removing $1"
 }
@@ -273,6 +308,7 @@ Remove()
 ###############################################################################
 CleaningRemove()
 {
+	CheckSystem
 	LogTitle "Removing contents of $BASEDIR/$1/*"
 	ExecuteCmd "rm -fr $BASEDIR/$1/*" "Removing contents of $BASEDIR/$1/*"
 }
@@ -282,6 +318,7 @@ CleaningRemove()
 ###############################################################################
 CleanInstall()
 {
+	CheckSystem
 	LogTitle "Cleaning $INSTALL"
 	ExecuteCmd "rm -fr $INSTALL/*" "Cleaning $INSTALL"
 }
@@ -291,12 +328,27 @@ CleanInstall()
 ###############################################################################
 CleanLocal()
 {
+	CheckSystem
 	LogTitle "Cleaning $BASEDIR Build files"
 	Remove $BINBUILD
 	Remove $GCCBUILD
 	Remove $NEWLIBBUILD
-	Remove $UCLIBCDIR
-	Remove $UCLIBCHDIR
+	if [ "$UCLIBCDIR" ]; then
+		Remove $UCLIBCDIR
+	fi
+	if [ "$GLIBCDIR" ]; then
+		Remove $GLIBCDIR
+	fi
+}
+
+###############################################################################
+# Checks to make sure a system has been selected
+###############################################################################
+CheckSystem()
+{
+	if [ ! "$SYSTEM" ]; then
+		LogFatal "You must select a system!"
+	fi
 }
 
 ###############################################################################
@@ -304,7 +356,7 @@ CleanLocal()
 ###############################################################################
 CheckExists()
 {
-	# It returns 0 so you can do "if CheckExists filename;" to check if 
+	# It returns 0 so you can do "if CheckExists filename;" to check if
 	# the file exists, and it looks more correct to me
 	#
 	# It has to be this way since "if function;" is executes the "if" if
@@ -322,13 +374,13 @@ CheckExists()
 }
 
 ###############################################################################
-# Mainly used to prepare for a release by cleaning all downloaded files and 
+# Mainly used to prepare for a release by cleaning all downloaded files and
 # removing all target directories.
 ###############################################################################
 DistClean()
 {
 	# I'd hate to see this in any other directory
-	cd $BASEDIR
+	QuietExec "cd $BASEDIR"
 	find . -name "*~" -exec rm {} \;
 	ExecuteCmd "rm -fr .linux-* .binutils-* .gcc-* .uClibc-* .newlib-* *.bz2 *.gz"
 	SetOptions Dreamcast
@@ -350,23 +402,27 @@ DistClean()
 ###############################################################################
 CheckDeps()
 {
+	if test ! "$(./config.guess | grep -i linux)"; then
+		LogFatal "Sorry, Checking for dependencies is only known to work in Linux... for now"
+	fi
+
 	# If a dependency is not found, it's put in this variable
 	local NOTFOUND=""
 
-	if ! DependsResult "sed --help"; then
+	if ! DependsResult "sed"; then
 		NOTFOUND= "sed"
 	fi
 
-	if ! DependsResult "mv --help"; then
+	if ! DependsResult "mv"; then
 		# Keep the list when adding a new missing dep
 		NOTFOUND="$NOTFOUND, mv"
 	fi
 
-	if ! DependsResult "cp --help"; then
+	if ! DependsResult "cp"; then
 		NOTFOUND="$NOTFOUND, cp"
 	fi
 
-	if ! DependsResult "ln --help"; then
+	if ! DependsResult "ln"; then
 		NOTFOUND="$NOTFOUND, ln"
 	fi
 
@@ -374,67 +430,67 @@ CheckDeps()
 		NOTFOUND="$NOTFOUND, pwd"
 	fi
 
-	if ! DependsResult "rm --help"; then
+	if ! DependsResult "rm"; then
 		NOTFOUND="$NOTFOUND, rm"
 	fi
 
-	if ! DependsResult "mkdir --help"; then
+	if ! DependsResult "mkdir"; then
 		NOTFOUND="$NOTFOUND, mkdir"
 	fi
 
-	if ! DependsResult "grep --help"; then
+	if ! DependsResult "grep"; then
 		NOTFOUND="$NOTFOUND, grep"
 	fi
 
-	if ! DependsResult "touch --help"; then
+	if ! DependsResult "touch"; then
 		NOTFOUND="$NOTFOUND, touch"
 	fi
 
-	if ! DependsResult "gcc --help"; then
+	if ! DependsResult "gcc"; then
 		NOTFOUND="$NOTFOUND, gcc"
 	fi
 
-	if ! DependsResult "ar --help"; then
+	if ! DependsResult "ar"; then
 		NOTFOUND="$NOTFOUND, binutils"
 	fi
 
-	if ! DependsResult "make --help"; then
+	if ! DependsResult "make"; then
 		NOTFOUND="$NOTFOUND, make"
 	fi
 
-	if ! DependsResult "makeinfo --help"; then
+	if ! DependsResult "makeinfo"; then
 		NOTFOUND="$NOTFOUND, texinfo"
 	fi
-	
-	if ! DependsResult "gzip --help"; then
+
+	if ! DependsResult "gzip"; then
 		NOTFOUND="$NOTFOUND, gzip"
 	fi
-	
-	if ! DependsResult "bunzip2 --help"; then
+
+	if ! DependsResult "bunzip2"; then
 		NOTFOUND="$NOTFOUND, bunzip2"
 	fi
 
-	if ! DependsResult "patch --help"; then
+	if ! DependsResult "patch"; then
 		NOTFOUND="$NOTFOUND, patch"
 	fi
 
-	if ! DependsResult "awk --help"; then
+	if ! DependsResult "awk"; then
 		NOTFOUND="$NOTFOUND, awk"
 	fi
 
-	if ! DependsResult "diff --help"; then
+	if ! DependsResult "diff"; then
 		NOTFOUND="$NOTFOUND, diff"
 	fi
 
-	if ! DependsResult "wget --help"; then
+	if ! DependsResult "wget"; then
 		NOTFOUND="$NOTFOUND, wget"
 	fi
 
-	if ! DependsResult "svn --help"; then
+	if ! DependsResult "svn"; then
 		NOTFOUND="$NOTFOUND, svn"
 	fi
 
-	if ! DependsResult "flex --help"; then
+	if ! DependsResult "flex"; then
 		NOTFOUND="$NOTFOUND, flex"
 	fi
 
@@ -456,22 +512,36 @@ CheckDeps()
 ###############################################################################
 DependsResult()
 {
+	# First check to see if it's in the current path (if not it might be
+	# builtin
+	if [ "$(which $1)" ]; then
+		if [ "$SILENT" -eq 0 ]; then
+			LogOutput "$1: $TEXTFOUND"
+		else
+			LogOutput "$1: [FOUND]"
+		fi
+
+		return 0
+	fi
+
+
 	# We don't want to use ExecuteCmd since that'll leave the script on
 	# errors
-	$1 > .tempdep 2> .tempdep
+	# Add --help so we at least know it won't go into a loop
+	$1 --help &> .tempdep
 
 	# If the command was successful, we're doing well
 	if [ $? -eq 0 ]; then
 		# Strip the " --help" from the command line
 		local COMMAND=$(echo $1 | sed "s/ --help//")
-		# Again, don't mess up logging 
+		# Again, don't mess up logging
 		if [ "$SILENT" -eq 0 ]; then
 			LogOutput "$COMMAND: $TEXTFOUND"
 		else
 			LogOutput "$COMMAND: [FOUND]"
 		fi
 		# Remove the temporary output/error file
-		rm .tempdep
+		QuietExec "rm .tempdep"
 		# return success
 		return 0
 	else
@@ -481,31 +551,42 @@ DependsResult()
 		else
 			LogError "$COMMAND: [NOT FOUND]"
 		fi
-		rm .tempdep
+		QuietExec "rm .tempdep"
 		return 1
 	fi
 }
 
 ###############################################################################
-# Since this is mainly for testing the script, most users don't want to or 
+# Since this is mainly for testing the script, most users don't want to or
 # need to build every single compiler available here
 # This is a utility since it's used to test the script.
 ###############################################################################
 TestAll()
 {
-	cd $BASEDIR
+	QuietExec "cd $BASEDIR"
 	SetOptions Dreamcast
 	BuildDreamcast
-	cd $BASEDIR
+	QuietExec "cd $BASEDIR"
 #	SetOptions Gamecube
 #	All
 	BuildLinux DcLinux
-	cd $BASEDIR
+	QuietExec "cd $BASEDIR"
 #	SetOptions Genesis
 #	All
 	BuildLinux GcLinux
-	cd $BASEDIR
+	QuietExec "cd $BASEDIR"
 	SetOptions Ix86
 	All
 }
 
+Package()
+{
+	QuietExec "cd $BASEDIR"
+	ExecuteCmd "mkdir -p ../buildcross-$BUILDCROSS_VERSION"
+	ExecuteCmd "cp -r *.sh COPYING ChangeLog NOTES config.guess options patches/ ../buildcross-$BUILDCROSS_VERSION" "Copying needed files to buildcross-$BUILDCROSS_VERSION"
+	BASEDIR=$BASEDIR/../buildcross-$BUILDCROSS_VERSION
+	DistClean
+	ExecuteCmd "tar cfj ../buildcross-$BUILDCROSS_VERSION.tar.bz2 ../buildcross-$BUILDCROSS_VERSION" "Taring buildcross-$BUILDCROSS_VERSION.tar.bz2"
+
+	exit 0
+}

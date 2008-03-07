@@ -10,14 +10,20 @@ Dreamcast
 	script to KOS's mailing list. If anything doesn't work because of the
 	toolchain, tell me and it will be usually fixed within a couple of days.
 	Unless of course I can't figure out what the problem is, it may take a 
-	bit longer in that case :-P
+	bit longer in that case :-P 
+	
+	The libbfd for building dc-tool is located in /usr/local/dc/HOSTGCC/sh-elf
+	by default. This often this will be what you need, changing i686-pc-linux-gnu
+	to what your system is, or changing /usr/local/dc to where you installed the
+	compiler chain.
+BFDLIB		= -L/usr/local/dc/i686-pc-linux-gnu/sh-elf/lib/ -Llusr/local/dc/lib/ -lbfd -liberty
+BFDINCLUDE	= /usr/local/dc/i686-pc-linux-gnu/sh-elf/include
 
 DcLinux
 	This is the other target I've been focusing on because of my own
-	interest. When version 1.6 is/was released, the DcLinux should work
-	fine. As of 1.5 I'm unsure if it's working or not. I not getting output
-	from the serial cable. Another one where if something doesn't work, let
-	me know and it will get fixed pretty quick.
+	interest. As of version 1.7 is/was released, the DcLinux should work
+	fine. Another one where if something doesn't work, let me know and it will
+	get fixed pretty quick.
 
 Gamecube
 	I wouldn't suggest you to use the this script to build a Gamecube
@@ -34,11 +40,12 @@ Genesis
 	need a whole lot of maintenance.
 
 Ix86
-	This compiler is compiled for 686 by default. If you plan to make
-	something for prior to Pentium 2 processors, you'll need to change it to
-	586. As of right now I haven't tested it much more than making sure it
-	compiles a few test files. When I have a bit of time I want to get KOS's
-	svn version working with this target again. No promises though. 
+	This compiler is compiled for i686 by default. If you plan to make
+	something for to target systems prior to Pentium 2 processors, you'll
+	need to change it to i586. As of right now I haven't tested it much more
+	than making sure it compiles a few test files. When I have a bit of time
+	I want to get KOS's svn version working with this target again. No promises
+	though. 
 
 Cross-compiling
 	From my experience you'll need the following to attempt to cross compile
@@ -59,4 +66,5 @@ Compiling toolchains with MinGW
 	Like for cross-compiling, you'll need MinGW's Gcc sources and have to 
 	extract, patch, and touch the files by hand. From there you should be
 	able to run buildcross.sh. IIRC, you have to run bash buildcross.sh 
-	otherwise you get a "bad interpreter" error.
+	otherwise you get a "bad interpreter" error. In theory this should work 
+	though.

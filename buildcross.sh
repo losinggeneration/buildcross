@@ -1,11 +1,8 @@
+#!/bin/sh
 ###############################################################################
-# Version 1.5
-###############################################################################
-# Copyright 2000-2006
+# Copyright 2000-2007
 #         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
 #         All rights reserved.
-###############################################################################
-#!/bin/bash
 ###############################################################################
 # Most UNIX based systems should have most all of this.
 # Depends on bash, sed, mv, cp, ln, pwd, rm, mkdir, grep, touch, and of course
@@ -22,6 +19,7 @@
 # Optional:
 # 3) Add your target to Usage()
 ###############################################################################
+BUILDCROSS_VERSION=1.7
 # To reduce clutter I've moved functions into separate files.
 # These will include the functions so we can call them from  here.
 ###############################################################################
@@ -33,6 +31,7 @@ source utilities.sh
 
 # how to configure/build each (Binutils, Gcc, Newlib, uClibc, & KOS)
 source build.sh
+
 ###############################################################################
 # Our main function because I like C-like code
 ###############################################################################
@@ -42,8 +41,8 @@ main()
 	Colorize
 	# Set up some things the user wont ever need to
 	# Default to $SYSTEM options
-	SetOptions $SYSTEM
-	
+	#SetOptions $SYSTEM
+
 	# Check if there aren't any arguments
 	if [ $# -le 0 ]; then
 		# No arguments so print usage and quit
@@ -51,7 +50,7 @@ main()
 		exit
 	fi
 
-	# Go through each argument that was given	
+	# Go through each argument that was given
 	for i in $*; do
 		if ! ParseArgs $i; then
 			LogError "Ignoring unsupported argument \"$i\"";

@@ -137,3 +137,53 @@ Version 1.6:
 	-Genesis was broken but now fixed. GAS in binutils 2.16.1 and 2.17 
 	 for m86k-coff seem to be disabled and so 2.15 is used and patched to
 	 work with gcc 4.x compilers. 
+Version 1.7:
+	-Bumped Newlib version to 1.15.0 for Dreamcast compilers.
+	-Created Glibc Linux cross compilers.
+	-Made -cu and -bu visible at options for uClibc.
+	-Glibc made default compiler unless USEUCLIBC is set.
+	-Added -cg -c2g -bg -b2g for Glibc building to options.
+	-Added -u and USEUCLIBC an two ways to idicate using uClibc for Linux
+	 compilers.
+	-Combined ConfigureBaseGcc and ConfigureFinalGcc.
+	-Combined BuildBaseGcc and BuildFinalGcc.
+	-Calling individual commands such as (-cb, -bb, -cig, etc) will clean 
+	 the directory build directory before running the command. Running -all
+	 and such commands will still not run commands that have already been
+	 run. 
+	-Linux compilers can choose to use different uClibc and kernel header
+	 versions/types. (for instance, kernel headers from the 2.6.20 branch
+	 instead of the libc-2.6.12 sterilized headers)
+	-Small changes to how success/fails are outputted [OK] and [FAIL].
+	-Linux compilers use sys-root now.
+	-Re-enabled Gamecube compiler with fixes (THREADS=yes) 
+	-Fixed a bug where -c would nuke the current directory on non-uClibc
+	 compilers.
+	-Fixed a small logic error and syntax error when checking for KOS and
+	 KOS ports.
+	-Added Distcc building example.
+	-Did some formatting changes to the examples output.
+	-Simplified the process of generating environ.sh for KOS. Now cut is
+	 required to setup KOS. (Not a problem in most every UNIX like
+	 environment.) 
+	-Updated the KOS/KOS Ports location for the update Sourceforge made to
+	 svn locations.
+	-Added archlinuxppc to targets. Useful as an example of how to create
+	 a custom compiler to your needs.
+	-Removed setting default system types since it shouldn't be done when
+	 building the native compiler with a cross compiler. This is because
+	 in case the cross compiler is in the path (which it should be to be
+	 used) there aren't any executable conflicts when building the native
+	 compiler.
+	-Changed behavior of HOSTPRE so the compiler prefix is the same and
+	 also it doesn't include the PATH in case of program name conflicts.
+	-Took paranoid approach to executing commands. 
+	-Fix to installing Glibc headers, include/bits may not be created by
+	 default, so we make sure it's there.
+	-Added --enable-install-libbfd to Dreamcast binutils options. It
+	 installs to $INSTALL/$HOSTGCC/sh-elf/{include,lib}. Those will be
+	 where you need to point dcload to. $HOSTGCC is typically be
+	 something like i686-pc-linux-gnu, powerpc-unknown-linux-gnu, etc.
+	-Updated NOTES to include some info about building dcload.
+	-Changed !/bin/bash to just !/bin/sh.
+	-Better checks for build dependencies.

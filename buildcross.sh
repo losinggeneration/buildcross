@@ -27,9 +27,11 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
+
 # Most UNIX based systems should have most all of this.
 # Depends on bash, sed, mv, cp, ln, pwd, rm, mkdir, grep, and of course gcc
 # and binutils
+
 
 # How to add another target:
 # Required:
@@ -38,18 +40,12 @@
 # Optional:
 # Add your target to Usage
 
+
 # Even though I'm relatively pleased with this script, there is one limitation
 # that I haven't bothered to address which is that the patches must all be in
 # one file (the same as the file-version). This could be fixed but I'm unsure
 # if there's a big enough need for that. Related to this is that gcc/binutils/
 # newlib will have to be removed before it's patched again.
-#
-# The other thing is that I don't check if a user has interrupted the script 
-# while one of the files is being untared. So it's very possible to interrupt
-# the script while untaring and rerun the script to find it just tries to 
-# configure instead of untar it fully. While the above I think could be fixed,
-# I can't think of an easy way to check this.
-# At least the user can easily fix it with $0 -c
 
 # What the sh compiler is called
 SHELF="sh-elf"
@@ -81,14 +77,29 @@ fi
 
 # Which thread model gcc should use
 if [ "x$THREADS" == "x" ]; then
-	# single, posix, or blank for gcc to choose the default threading
+	# single, posix, or yes for gcc to choose the default threading
 	THREADS="yes"
+fi
+
+# Some custom CFLAGS to use
+if [ "x$BCCFLAGS" != "x" ]; then
+	export CFLAGS=$BCCFLAGS
 fi
 
 # Which languages gcc should build
 if [ "x$LANGUAGES" == "x" ]; then
 	# c, c++ are sure things, java, ada, objc
 	LANGUAGES="c,c++"
+fi
+
+# For cross-compiling... It can sure be a bitch sometimes
+if [ "x$HOSTPRE" != "x" ]; then
+	# Apparently gcc has some issues with setting build to host
+	# I got this basic idea and the sed from crosstool-0.38
+	BUILD="--build=$(echo $(./config.guess) | sed s/-/-build_/)"
+	HOST="$BUILD --host=$HOSTPRE"
+else
+	HOST=""
 fi
 
 # By default show output
@@ -139,13 +150,13 @@ SetOptions()
 			# Where to install to
 			INSTALL="/usr/local/dc"
 			# Binutils options
-			BINOPTS="--disable-nls --with-sysroot=$INSTALL"
+			BINOPTS="$HOST --disable-nls --with-sysroot=$INSTALL"
 			# Gcc base options
-			GCCBOPTS="--with-newlib --disable-nls --without-headers --disable-threads --enable-languages=c"
+			GCCBOPTS="$HOST --with-newlib --disable-nls --without-headers --disable-threads --enable-languages=c"
 			# Final Gcc options
-			GCCFOPTS="--with-newlib --disable-nls --enable-symvers=gnu --enable-threads=$THREADS --enable-languages=$LANGUAGES"
+			GCCFOPTS="$HOST --with-newlib --disable-nls --enable-symvers=gnu --enable-threads=$THREADS --enable-languages=$LANGUAGES"
 			# Newlib options
-			NEWLIBOPTS=""
+			NEWLIBOPTS="$HOST"
 			# Target
 			DCTARG="$SHELF"
 			# Used during building of newlib
@@ -161,13 +172,13 @@ SetOptions()
 			# Where to install to
 			INSTALL="/usr/local/genesis"
 			# Binutils options
-			BINOPTS="--disable-nls --with-sysroot=$INSTALL"
+			BINOPTS="$HOST --disable-nls --with-sysroot=$INSTALL"
 			# Gcc base options
-			GCCBOPTS="--with-newlib --disable-nls --disable-multilib --disable-libssp --without-headers --disable-threads --enable-languages=c"
+			GCCBOPTS="$HOST --with-newlib --disable-nls --disable-multilib --disable-libssp --without-headers --disable-threads --enable-languages=c"
 			# Final Gcc options
 			GCCFOPTS="$GCCBOPTS"
 			# Newlib options
-			NEWLIBOPTS=""
+			NEWLIBOPTS="$HOST"
 			# Target
 			GENTARG="m68k-genesis-coff"
 			# Used during building of newlib
@@ -185,13 +196,13 @@ SetOptions()
 			# The target
 			TARG1="$GCTARG"
 			# Binutils options
-			BINOPTS="--disable-nls --with-sysroot=$INSTALL"
+			BINOPTS="$HOST --disable-nls --with-sysroot=$INSTALL"
 			# Gcc base options
-			GCCBOPTS="--with-cpu=750 --with-gcc --with-gnu-ld --with-gnu-as --with-stabs --with-included-gettext --without-headers --disable-nls --disable-shared --disable-threads --disable-multilib --disable-debug --disable-win32-registry --with-newlib --enable-languages=c"
+			GCCBOPTS="$HOST --with-cpu=750 --with-gcc --with-gnu-ld --with-gnu-as --with-stabs --with-included-gettext --without-headers --disable-nls --disable-shared --disable-threads --disable-multilib --disable-debug --disable-win32-registry --with-newlib --enable-languages=c"
 			# Final Gcc options
-			GCCFOPTS="--with-cpu=750 --with-gcc --with-gnu-ld --with-gnu-as --with-stabs --with-included-gettext --without-headers --disable-nls --disable-shared --enable-threads=$THREADS --disable-multilib --disable-debug --disable-win32-registry --with-newlib --enable-__cxa_atexit --enable-c99 --enable-long-long --enable-languages=$LANGUAGES"
+			GCCFOPTS="$HOST --with-cpu=750 --with-gcc --with-gnu-ld --with-gnu-as --with-stabs --with-included-gettext --without-headers --disable-nls --disable-shared --enable-threads=$THREADS --disable-multilib --disable-debug --disable-win32-registry --with-newlib --enable-__cxa_atexit --enable-c99 --enable-long-long --enable-languages=$LANGUAGES"
 			# Newlib options
-			NEWLIBOPTS=""
+			NEWLIBOPTS="$HOST"
 			# End Gamecube options
 			;;
 	esac
@@ -251,8 +262,8 @@ UntarPatch()
 Untar()
 {
 	# check if the directory for the source exists
-	# Note if it's only partially untared this still works... oh well
-	if [ ! -d $1 ]; then
+	# and that we got to touch that it's untared
+	if [ ! -d $1 -o ! -e $1/.untared ]; then
 		# Now check if the tar.bz2 file exists
 		if [ ! -e $1.tar.bz2 ]; then
 			# if it doesn't try for tar.gz
@@ -264,12 +275,16 @@ Untar()
 				# We have the tar.gz hooray
 				echo "Untaring $1.tar.gz"
 				tar xfz $1.tar.gz
+				# A quick way to tell if we need to untar or not
+				touch $1/.untared
 				return 1
 			fi
 		else
 			# Well we have the tar.bz2 good job
 			echo "Untaring $1.tar.bz2"
 			tar xfj $1.tar.bz2
+			# A quick way to tell if we need to untar or not
+			touch $1/.untared
 			return 1
 		fi
 	fi
@@ -294,7 +309,7 @@ Patch()
 Remove()
 {
 	echo "Removing contens of $BASEDIR/$1/*"
-	rm -fr $BASEDIR/$1/*
+	rm -fr $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*
 }
 
 # See if a command like make exited cleanly
@@ -325,10 +340,10 @@ CleanLocal()
 	Remove $NEWLIBBUILD
 }
 
-# Check for makefile to determine if we should rerun the configure part
-CheckMakefile()
+# Check to see if file exists
+CheckExists()
 {
-	if [ -e $1/Makefile ]; then
+	if [ -e $1 ]; then
 		return 0
 	fi
 
@@ -345,7 +360,8 @@ ConfigureBin()
 	# Try to Untar and Patch Binutils if needed
 	UntarPatch $BINVER $BINPATCH
 	
-	if ! CheckMakefile $BINBUILD; then
+	# Check if we've already configured. If not, configure
+	if ! CheckExists $BINBUILD/.config; then
 		# Remove the contents of the build directory
 		Remove $BINBUILD
 		# Go to the build directory
@@ -353,14 +369,17 @@ ConfigureBin()
 
 		if [ $SILENT -eq 0 ]; then
 			# If it's to be noisy
-			CFLAGS=$BCFLAGS ../$BINVER/configure $PREFIX $TARGET $BINOPTS
+			../$BINVER/configure $HOST $PREFIX $TARGET $BINOPTS
 		else
 			# If it's to be silent
-			CFLAGS=$BCFLAGS ../$BINVER/configure $PREFIX $TARGET $BINOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+			../$BINVER/configure $HOST $PREFIX $TARGET $BINOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
 		fi
 
 		# See if configure exited cleanly
 		Result "Configuring binutils"
+		touch .config
+	else
+		echo "Already configured"
 	fi
 
 	# Go back to the base directory
@@ -374,26 +393,34 @@ ConfigureBin()
 BuildBin()
 {
 	echo "Building binutils"
-	# Change to the build directory
-	cd $BASEDIR/$BINBUILD
+	
+	# Check if we've installed binutils already
+	if ! CheckExists $BINBUILD/.installed; then
+		# Change to the build directory
+		cd $BASEDIR/$BINBUILD
 
-	if [ $SILENT -eq 0 ]; then
-		# If it's noisy build and install
-		$MAKE all 
-		Result "$MAKE all"
-		$MAKE install
+		if [ $SILENT -eq 0 ]; then
+			# If it's noisy build and install
+			$MAKE all 
+			Result "$MAKE all"
+			$MAKE install
+		else
+			# If it's a quiet build and install, send the output to
+			# $SENDTOWHERE and $ERRORTOWHERE
+			$MAKE all > $SENDTOWHERE 2> $ERRORTOWHERE
+			Result "$MAKE all"
+			$MAKE install > $SENDTOWHERE 2> $ERRORTOWHERE
+		fi
+
+		# See if the makes exited cleanly
+		# This should relatively be ok since install wont work (fully)
+		# if make all didn't complete
+		Result "Building binutils"
+		touch .installed
 	else
-		# If it's a quiet build and install, send the output to
-		# $SENDTOWHERE and $ERRORTOWHERE
-		$MAKE all > $SENDTOWHERE 2> $ERRORTOWHERE
-		Result "$MAKE all"
-		$MAKE install > $SENDTOWHERE 2> $ERRORTOWHERE
+		echo "Binutils already installed"
 	fi
 
-	# See if the makes exited cleanly
-	# This should relatively be ok since install wont work (fully) if make
-	# all didn't complete
-	Result "Building binutils"
 	# Go back to the base directory
 	cd $BASEDIR
 }
@@ -404,17 +431,25 @@ ConfigureBaseGcc()
 	echo "Configuring initial gcc"
 	UntarPatch $GCCVER $GCCPATCH
 
-	if ! CheckMakefile $GCCBUILD; then
-		Remove $GCCBUILD
-		cd $BASEDIR/$GCCBUILD
+	# Don't configure base if the final is configured
+	if ! CheckExists $GCCBUILD/.finalconfig; then
+		if ! CheckExists $GCCBUILD/.config; then
+			Remove $GCCBUILD
+			cd $BASEDIR/$GCCBUILD
 
-		if [ $SILENT -eq 0 ]; then
-			CFLAGS=$BCFLAGS ../$GCCVER/configure $TARGET $PREFIX $GCCBOPTS
+			if [ $SILENT -eq 0 ]; then
+				../$GCCVER/configure $HOST $TARGET $PREFIX $GCCBOPTS
+			else
+				../$GCCVER/configure $HOST $TARGET $PREFIX $GCCBOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+			fi
+
+			Result "Configuring initial gcc"
+			touch .config
 		else
-			CFLAGS=$BCFLAGS ../$GCCVER/configure $TARGET $PREFIX $GCCBOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+			echo "Base gcc already configured"
 		fi
-
-		Result "Configuring initial gcc"
+	else
+		echo "Final gcc already configured, not configuring initial again"
 	fi
 
 	cd $BASEDIR
@@ -424,19 +459,30 @@ ConfigureBaseGcc()
 BuildBaseGcc()
 {
 	echo "Building initial gcc"
-	cd $BASEDIR/$GCCBUILD
 
-	if [ $SILENT -eq 0 ]; then
-		$MAKE all-gcc 
-		Result "$MAKE all-gcc"
-		$MAKE install-gcc 
+	if ! CheckExists $GCCBUILD/.finalconfig; then
+		if ! CheckExists $GCCBUILD/.installed; then
+			cd $BASEDIR/$GCCBUILD
+
+			if [ $SILENT -eq 0 ]; then
+				$MAKE all-gcc 
+				Result "$MAKE all-gcc"
+				$MAKE install-gcc 
+			else
+				$MAKE all-gcc > $SENDTOWHERE 2> $ERRORTOWHERE
+				Result "$MAKE all-gcc"
+				$MAKE install-gcc > $SENDTOWHERE 2> $ERRORTOWHERE
+			fi
+	
+			Result "Building initial gcc"
+			touch .installed
+		else
+			echo "Initial gcc already installed"
+		fi
 	else
-		$MAKE all-gcc > $SENDTOWHERE 2> $ERRORTOWHERE
-		Result "$MAKE all-gcc"
-		$MAKE install-gcc > $SENDTOWHERE 2> $ERRORTOWHERE
+		echo "Final gcc already configured, not building initial agian"
 	fi
-
-	Result "Building initial gcc"
+	
 	cd $BASEDIR
 }
 
@@ -446,17 +492,20 @@ ConfigureNewlib()
 	echo "Configuring Newlib"
 	UntarPatch $NEWLIBVER $NEWLIBPATCH
 
-	if ! CheckMakefile $NEWLIBBUILD; then
+	if ! CheckExists $NEWLIBBUILD/.config; then
 		Remove $NEWLIBBUILD
 		cd $BASEDIR/$NEWLIBBUILD
 
 		if [ $SILENT -eq 0 ]; then
-			CFLAGS=$BCFLAGS ../$NEWLIBVER/configure $TARGET $PREFIX $NEWLIBOPTS
+			../$NEWLIBVER/configure $HOST $TARGET $PREFIX $NEWLIBOPTS
 		else
-			CFLAGS=$BCFLAGS ../$NEWLIBVER/configure $TARGET $PREFIX $NEWLIBOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+			../$NEWLIBVER/configure $HOST $TARGET $PREFIX $NEWLIBOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
 		fi
 
 		Result "Configuring Newlib"
+		touch .config
+	else
+		echo "Newlib already configured"
 	fi
 
 	cd $BASEDIR
@@ -466,19 +515,25 @@ ConfigureNewlib()
 BuildNewlib()
 {
 	echo "Building Newlib"
-	cd $BASEDIR/$NEWLIBBUILD
+	if ! CheckExists $NEWLIBBUILD/.installed; then
+		cd $BASEDIR/$NEWLIBBUILD
 
-	if [ $SILENT -eq 0 ]; then
-		$MAKE
-		Result "$MAKE"
-		$MAKE install
+		if [ $SILENT -eq 0 ]; then
+			$MAKE
+			Result "$MAKE"
+			$MAKE install
+		else
+			$MAKE > $SENDTOWHERE 2> $ERRORTOWHERE
+			Result "$MAKE"
+			$MAKE install > $SENDTOWHERE 2> $ERRORTOWHERE
+		fi
+
+		Result "Building Newlib"
+		touch .installed
 	else
-		$MAKE > $SENDTOWHERE 2> $ERRORTOWHERE
-		Result "$MAKE"
-		$MAKE install > $SENDTOWHERE 2> $ERRORTOWHERE
+		echo "Newlib already installed"
 	fi
 
-	Result "Building Newlib"
 	cd $BASEDIR
 
 	if [[ $TARG == $DCTARG && $THREADS == "posix" ]]; then
@@ -506,19 +561,24 @@ ConfigureFinalGcc()
 	echo "Configuring final gcc"
 	UntarPatch $GCCVER $GCCPATCH
 
-	# I don't like seeing "(reconfigured)" from gcc not to mention I don't
-	# want to set up a way to test if we should remove the contents of
-	# $GCCBUILD or not
-	Remove $GCCBUILD
-	cd $BASEDIR/$GCCBUILD
+	if ! CheckExists $GCCBUILD/.finalconfig; then
+		# I don't like seeing "(reconfigured)" from gcc
+		Remove $GCCBUILD
+	
+		cd $BASEDIR/$GCCBUILD
 
-	if [ $SILENT -eq 0 ]; then
-		CFLAGS=$BCFLAGS ../$GCCVER/configure $TARGET $PREFIX $GCCFOPTS
+		if [ $SILENT -eq 0 ]; then
+			../$GCCVER/configure $HOST $TARGET $PREFIX $GCCFOPTS
+		else
+			../$GCCVER/configure $HOST $TARGET $PREFIX $GCCFOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+		fi
+
+		Result "Configuring final gcc"
+		touch .finalconfig
 	else
-		CFLAGS=$BCFLAGS ../$GCCVER/configure $TARGET $PREFIX $GCCFOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+		echo "Already configured"
 	fi
 
-	Result "Configuring final gcc"
 	cd $BASEDIR
 }
 
@@ -526,19 +586,26 @@ ConfigureFinalGcc()
 BuildFinalGcc()
 {
 	echo "Building final gcc"
-	cd $BASEDIR/$GCCBUILD
+	
+	if ! CheckExists $GCCBUILD/.finalinstalled; then
+		cd $BASEDIR/$GCCBUILD
 
-	if [ $SILENT -eq 0 ]; then
-		$MAKE all 
-		Result "$MAKE all"
-		$MAKE install
+		if [ $SILENT -eq 0 ]; then
+			$MAKE all 
+			Result "$MAKE all"
+			$MAKE install
+		else
+			$MAKE all > $SENDTOWHERE 2> $ERRORTOWHERE
+			Result "$MAKE all"
+			$MAKE install > $SENDTOWHERE 2> $ERRORTOWHERE
+		fi
+
+		Result "Building final gcc"
+		touch .finalinstalled
 	else
-		$MAKE all > $SENDTOWHERE 2> $ERRORTOWHERE
-		Result "$MAKE all"
-		$MAKE install > $SENDTOWHERE 2> $ERRORTOWHERE
+		echo "Final gcc already installed"
 	fi
 
-	Result "Building final gcc"
 	cd $BASEDIR
 }
 
@@ -671,6 +738,8 @@ Examples()
 	echo "LANGUAGES	c, c++ usually will work but java, ada, objc are also usable"
 	echo "THREADS		Which thread model to use, posix, single, or \"\" (blank)"
 	echo "BCCFLAGS	To define custom CFLAGS for building defaults to \"\""
+	echo "HOSTPRE		This will allow you to try and compile with a cross-compiler."
+	echo "		I haven't had much luck with doing this though"
 	echo
 	echo "Tell where kos is located and install the Dreamcast compiler"
 	echo "KOSLOCATION=\`pwd\`/../kos $0 -dc"
@@ -684,6 +753,9 @@ Examples()
 	echo
 	echo "Make Dreamcast compiler and put it in a test directory"
 	echo "TESTING=1 $0 -dc"
+	echo
+	echo "Make Dreamcast compiler with cross-compiler and put it test directory"
+	echo "TESTING=1 HOSTPRE=sh4-linux-uclibc $0 -dc"
 }
 
 # Print the usage for this script
@@ -722,7 +794,7 @@ Usage()
 	echo "	   should be called before all that you want silent"
 	echo "	   or change $SENDTOWHERE in this script)"
 	echo
-	echo "	-e Show some examples"
+	echo "	-e Show some examples and setable variables"
 }
 
 # This will sort through all arguments and return 0 if it's found and 1 if not
@@ -840,7 +912,7 @@ Setup()
 		mkdir $INSTALL
 	fi
 
-	export PATH=$PATH:$INSTALL/bin
+	export PATH=$INSTALL/bin:$PATH
 }
 
 main()

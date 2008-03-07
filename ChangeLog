@@ -1,0 +1,21 @@
+Version 1.0:
+	-Initial release.
+
+Version 1.1:
+	-Some KOS fix-ups for generating the environ.sh file.
+
+Version 1.2:
+	-Added this file.
+	-Changed the export PATH in Setup to include the newly installed
+	 compiler first to use that instead of one that might be installed in a
+	 path before that one.
+	-Added support to try and use a cross compiler. I haven't been able to
+	 get this to compile, but I don't think it's the scripts fault.
+	-Added a way to check if the file was interrupted during untaring or
+	 not.
+	-Added support for using custom CFLAGS if you'd like.
+	-Added config.guess which buildcross.sh uses to change --build on
+	 cross-compiles so gcc doesn't try setting build equal to host.
+	-Added checks to see if each is already configured/installed or not.
+	 This also fixes when gcc final is built so it doesn't remove the
+	 contents if it's configured to build already.

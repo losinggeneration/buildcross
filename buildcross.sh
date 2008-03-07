@@ -38,6 +38,8 @@ source build.sh
 ###############################################################################
 main()
 {
+	# Turn on colors by default
+	Colorize
 	# Set up some things the user wont ever need to
 	# Default to $SYSTEM options
 	SetOptions $SYSTEM

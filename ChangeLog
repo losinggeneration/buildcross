@@ -106,11 +106,34 @@ Version 1.5:
 	-Removed some patches that were not needed.
 
 Version 1.6:
+	-Added ability to check if the dependencies are available.
 	-Added GameCube Linux target and uses uClibc.
-	-Imported some patches for gclinux.
+	-Imported some patches for GcLinux.
 	-Changed BuildDcLinux to BuildLinux.
 	-Moved kernel headers to download/patch the normal way. (AKA cleanup.)
 	-ConfigureuClibc now is extendable for other platforms with a case
 	 statement.
 	-Added -distclean option to remove sources, dot files, and file
 	 archives. Things needed to be done either before a release mainly.
+	-Changes to condense some code.
+	-Added LogFatal to exit on fatal errors.
+	-Fixed behavior for if .file-downloaded exists but the actual file
+	 doesn't.
+	-Took the paranoid approach of checking for errors on any command that
+	 could fail. BuildCross will be a bit noisier now.
+	-Simplified some if statements.
+	-Fixed possible tar errors if tar file is corrupt. Though this is not
+	 fool-proof.
+	-Genesis got bumped back to using binutils-2.16.1.
+	-Fixed major problem when using genesis and -c.
+	-Added ability to use colored output with Linux.
+	-Fixed bug that would break building uClibc after a few builds.
+	-Fixes to get building a cross compiler with a cross compiler working
+	 again. Only tested with GcLinux building GcLinux.
+	-Gamecube target seems to be broken, it's disabled till it can be
+	 fixed again. It shouldn't be too hard to fix, I'm just not going to
+	 do it for this release. It fails on second pass of building Gcc at
+	 the posix threads code.
+	-Genesis was broken but now fixed. GAS in binutils 2.16.1 and 2.17 
+	 for m86k-coff seem to be disabled and so 2.15 is used and patched to
+	 work with gcc 4.x compilers. 

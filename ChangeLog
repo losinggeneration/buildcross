@@ -30,4 +30,7 @@ Version 1.3:
 	-Changed some things about how kos is built. It also builds ports.
 	-Added ix86 target.
 	-KOS is built with the -dc command now
+Version 1.3.1:
+	-Fixed deadlocking bug in newlib patches.
+	-Moved newlib-1.12.0-kos.diff to newlib-1.12.0.diff.
 

@@ -119,7 +119,7 @@ diff -ruN newlib-1.12.0/newlib/libc/sys/sh/sys/lock.h newlib-1.12.0-kos/newlib/l
 +typedef struct { int a, b, c; } _LOCK_RECURSIVE_T;
 +
 +#define __LOCK_INIT(class,lock) class _LOCK_T lock = 0;
-+#define __LOCK_INIT_RECURSIVE(class,lock) class _LOCK_T lock = { 0, 0, 0 };
++#define __LOCK_INIT_RECURSIVE(class,lock) class _LOCK_RECURSIVE_T lock = { 0, 0, 0 };
 +#define __lock_init(lock) __newlib_lock_init(&(lock))
 +#define __lock_init_recursive(lock) __newlib_lock_init_recursive(&(lock))
 +#define __lock_close(lock) __newlib_lock_close(&(lock))

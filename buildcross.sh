@@ -1,8 +1,10 @@
-#!/bin/bash
-# Version 1.0
+###############################################################################
+# Version 1.3
+###############################################################################
 # Copyright 2000-2006
-#         Harley Laue and others (as noted). All rights reserved.
-# 
+#         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
+#         All rights reserved.
+###############################################################################
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
@@ -26,39 +28,86 @@
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
+###############################################################################
+#!/bin/bash
+###############################################################################
 
-
+###############################################################################
 # Most UNIX based systems should have most all of this.
-# Depends on bash, sed, mv, cp, ln, pwd, rm, mkdir, grep, and of course gcc
-# and binutils
-
-
+# Depends on bash, sed, mv, cp, ln, pwd, rm, mkdir, grep, touch, and of course
+# a working development system (gcc, binutils, make, etc)
+#
+# Also wget to download files and svn to get KOS
+###############################################################################
 # How to add another target:
 # Required:
 # Add the options you need to SetOptions (Use one of there as a template)
 # Add target name to ParseArgs and have it call SetOptions
 # Optional:
 # Add your target to Usage
-
-
+###############################################################################
 # Even though I'm relatively pleased with this script, there is one limitation
 # that I haven't bothered to address which is that the patches must all be in
 # one file (the same as the file-version). This could be fixed but I'm unsure
 # if there's a big enough need for that. Related to this is that gcc/binutils/
 # newlib will have to be removed before it's patched again.
+###############################################################################
 
+###############################################################################
+# Options you may want to change
+# You may also want to go down and look at the INSTALL variable for your target
+###############################################################################
+#By default show output
+SILENT=0
+# Gcc version to build
+GCCVER="gcc-3.4.6"
+# Binutils version to build
+BINVER="binutils-2.16.1"
+# Newlib version to build
+NEWLIBVER="newlib-1.13.0"
+# Target choice: "Dreamcast", "Genesis", "Gamecube", or "ix86"
+SYSTEM="Dreamcast"
+# Directory to build from
+BASEDIR=`pwd`
+###############################################################################
+
+###############################################################################
+# Where the patches are
+###############################################################################
+# Patches should be a single file
+PATCHBASEDIR="$BASEDIR/patches"
+# Binutils patch
+BINPATCH="$BINVER.diff"
+# Gcc patch
+GCCPATCH="$GCCVER.diff"
+# Newlib patch
+NEWLIBPATCH="$NEWLIBVER.diff"
+###############################################################################
+
+
+###############################################################################
+# Compiler prefixes
+###############################################################################
 # What the sh compiler is called
 SHELF="sh-elf"
 # What the arm compiler is called
 ARMELF="arm-elf"
+# What the mk68k compiler is called
+M68KCOFF="m68k-genesis-coff"
+# What the x86 compiler is called
+XI86ELF="i686-elf"
+# What the Powerpc compiler is called
+PPCELF="powerpc-gekko-elf"
+###############################################################################
 
+###############################################################################
+# User changable variables
+###############################################################################
 # For the BSD people who need it to be gmake
 if [ "x$MAKE" == "x" ]; then
 	MAKE="make"
 fi
 
-# Directory to build from
-BASEDIR=`pwd`
 # Where to send the output from make and configure
 if [ "x$SENDTOWHERE" == "x" ]; then
 	# To output to a log
@@ -102,24 +151,6 @@ else
 	HOST=""
 fi
 
-# By default show output
-SILENT=0
-# Gcc version to build
-GCCVER="gcc-3.4.6"
-# Binutils version to build
-BINVER="binutils-2.16.1"
-# Newlib version to build
-NEWLIBVER="newlib-1.13.0"
-# Where the patches are
-# Patches should be a single file
-PATCHBASEDIR="$BASEDIR/patches"
-# Binutils patch
-BINPATCH="$BINVER.diff"
-# Gcc patch
-GCCPATCH="$GCCVER.diff"
-# Newlib patch
-NEWLIBPATCH="$NEWLIBVER.diff"
-
 # To install to a temporary directory testcompiler
 if [ x$TESTING == x ]; then
 	TESTING=0
@@ -129,12 +160,12 @@ fi
 if [ "x$BCCFLAGS" == "x" ]; then
 	BCCFLAGS=""
 fi
+###############################################################################
 
-# Target choice: "Dreamcast", "Genesis", or "Gamecube"
-SYSTEM="Dreamcast"
-
+###############################################################################
 # Below are options that you may or may not want to change for your system
 # of choice
+###############################################################################
 SetOptions()
 {
 	case $1 in 
@@ -180,19 +211,23 @@ SetOptions()
 			# Newlib options
 			NEWLIBOPTS="$HOST"
 			# Target
-			GENTARG="m68k-genesis-coff"
+			GENTARG="$M68KCOFF"
 			# Used during building of newlib
 			TARG1="$GENTARG"
 			# End Genesis options
 			;;
 		"Gamecube")
 			# Gamecube options
+			#######################################################
+			# Some of these options are taken from
+			# the DevKitPPC build of gcc
+			#######################################################
 			# Where the Gamecube patches are
 			PATCHDIR="$PATCHBASEDIR/gamecube"
 			# Where to install to
 			INSTALL="/usr/local/gamecube"
 			# Gamecube target
-			GCTARG="powerpc-gekko-elf"
+			GCTARG="$PPCELF"
 			# The target
 			TARG1="$GCTARG"
 			# Binutils options
@@ -205,6 +240,31 @@ SetOptions()
 			NEWLIBOPTS="$HOST"
 			# End Gamecube options
 			;;
+		"ix86")
+			if [ "x$KOSLOCATION" == "x" ]; then
+				KOSLOCATION="$BASEDIR/kos"
+			fi
+
+			# Where the ix86 patches are
+			PATCHDIR="$PATCHBASEDIR/ix86"
+			# Where to install to
+			INSTALL="/usr/local/ix86"
+			# Binutils options
+			BINOPTS="--disable-nls --with-sysroot=$INSTALL"
+			# Gcc base options
+			GCCBOPTS="--with-newlib --disable-nls --without-headers --disable-threads --enable-languages=c"
+			# Final Gcc options
+			GCCFOPTS="--with-newlib --disable-nls --enable-symvers=gnu --enable-threads=$THREADS --enable-languages=$LANGUAGES"
+			# Newlib options
+			NEWLIBOPTS=""
+			# Target
+			IXTARG="i686-elf"
+			SHELF="i686-elf"
+			# Used during building of newlib
+			TARG1="$IXTARG"
+			# End iX86 options
+			;;
+
 	esac
 
 	# This is here for debugging the script without clobbering the main
@@ -215,7 +275,9 @@ SetOptions()
 	fi
 }
 
+###############################################################################
 # Set some variables specific for Target 2
+###############################################################################
 SetTarg2()
 {
 	TARG=$TARG2
@@ -230,7 +292,9 @@ SetTarg2()
 	GCCFOPTS="--with-arch=armv4 $GCCFOPTS"
 }
 
+###############################################################################
 # Create directories to build in
+###############################################################################
 CreateDir()
 {
 	if [ ! -d $BINBUILD ]; then
@@ -245,9 +309,11 @@ CreateDir()
 	fi
 }
 
+###############################################################################
 # 1) Try to create directories if needed
 # 2) If untar returns true than patch it
 # Otherwise it does nothing
+###############################################################################
 UntarPatch()
 {
 	CreateDir
@@ -258,19 +324,33 @@ UntarPatch()
 	fi
 }
 
+###############################################################################
 # Untar the source if needed
+###############################################################################
 Untar()
 {
 	# check if the directory for the source exists
 	# and that we got to touch that it's untared
 	if [ ! -d $1 -o ! -e $1/.untared ]; then
 		# Now check if the tar.bz2 file exists
-		if [ ! -e $1.tar.bz2 ]; then
+		if ! CheckExists $1.tar.bz2; then
 			# if it doesn't try for tar.gz
-			if [ ! -e $1.tar.gz ]; then
-				# if not we don't have the archive so exit
-				echo "$1.tar.bz2 or $1.tar.gz not found"
-				exec false
+			if ! CheckExists $1.tar.gz; then
+				# if not we don't have the archive so
+				# download it
+				if ! Download $1; then
+					echo "Error downloading file and file not found. Exiting now."
+					exec false
+				fi
+
+				# We need to untar it after it's downloaded
+				# and return the value. It would have been
+				# nice if I could have did a "return Untar $1"
+				if Untar $1; then	
+					return 1
+				else
+					return 0
+				fi
 			else
 				# We have the tar.gz hooray
 				echo "Untaring $1.tar.gz"
@@ -293,7 +373,63 @@ Untar()
 	return 0
 }
 
+###############################################################################
+# Download the file
+###############################################################################
+Download()
+{
+	# Simple way to log wget messages without a bunch of ifs
+	if [ $SILENT -eq 1 ]; then
+		WGETOUT="-a $SENDTOWHERE"
+	fi
+
+	case $1 in
+		"$BINVER")
+			wget $WGETOUT ftp://ftp.gnu.org/gnu/binutils/$BINVER.tar.bz2
+			#if [ $CHECKSIG ]; then
+			#	wget ftp://ftp.gnu.org/gnu/binutils/$BINVER.tar.bz2.sig
+			#fi
+			;;
+		"$GCCVER")
+			wget $WGETOUT ftp://ftp.gnu.org/gnu/gcc/$GCCVER/$GCCVER.tar.bz2
+			#if [ $CHECKSIG ]; then
+			#	wget ftp://ftp.gnu.org/gnu/gcc/$GCCVER/$GCCVER.tar.bz2.sig
+			#fi
+				
+			;;
+		"$NEWLIBVER")
+			wget $WGETOUT ftp://sources.redhat.com/pub/newlib/$NEWLIBVER.tar.gz
+			#if [ $CHECKSIG ]; then
+			#	wget ftp://sources.redhat.com/pub/newlib/md5sum
+			#	md5sum -c $NEWLIBVER.tar.bz2 md5sum
+			#fi
+			;;
+		"kos")
+			if [ ! -d $KOSLOCATION ]; then
+				if [ $SILENT -eq 0 ]; then
+					svn co https://svn.sourceforge.net/svnroot/cadcdev/kos
+				else
+					svn co https://svn.sourceforge.net/svnroot/cadcdev/kos > $SENDTOWHERE 2> $ERRORTOWHERE
+				fi
+			fi
+			if [ ! -d $KOSLOCATION/../kos-ports ]; then
+				if [ $SILENT -eq 0 ]; then
+					svn co https://svn.sourceforge.net/svnroot/cadcdev/kos-ports
+				else
+					svn co https://svn.sourceforge.net/svnroot/cadcdev/kos-ports > $SENDTOWHERE 2> $ERRORTOWHERE
+				fi
+			fi
+			;;
+	esac
+	# Print the result and exit if failed
+	Result "Downoad of $1"
+
+	return 0;
+}	
+
+###############################################################################
 # Try to patch the file
+###############################################################################
 Patch()
 {
 	# if the patch exists.... You get the idea
@@ -305,14 +441,18 @@ Patch()
 	fi
 }
 
+###############################################################################
 # Remove the contents of a directory
+###############################################################################
 Remove()
 {
 	echo "Removing contens of $BASEDIR/$1/*"
 	rm -fr $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*
 }
 
+###############################################################################
 # See if a command like make exited cleanly
+###############################################################################
 Result() 
 {
 	# I assume the programmers use 0 for clean and other values for not
@@ -324,14 +464,18 @@ Result()
 	fi
 }
 
+###############################################################################
 # Clean the install directory
+###############################################################################
 CleanInstall()
 {
 	echo "Cleaning $INSTALL"
 	rm -fr $INSTALL/*
 }
 
+###############################################################################
 # Clean the local directories
+###############################################################################
 CleanLocal()
 {
 	echo "Cleaning $BASEDIR Build files"
@@ -340,7 +484,9 @@ CleanLocal()
 	Remove $NEWLIBBUILD
 }
 
+###############################################################################
 # Check to see if file exists
+###############################################################################
 CheckExists()
 {
 	if [ -e $1 ]; then
@@ -350,10 +496,12 @@ CheckExists()
 	return 1
 }
 
+###############################################################################
 # Configure Binutils
-#
+###############################################################################
 # Since all configures are basically the same this one will
 # be the only one documented fully
+###############################################################################
 ConfigureBin()
 {
 	echo "Configuring binutils"
@@ -369,10 +517,10 @@ ConfigureBin()
 
 		if [ $SILENT -eq 0 ]; then
 			# If it's to be noisy
-			../$BINVER/configure $HOST $PREFIX $TARGET $BINOPTS
+			../$BINVER/configure $PREFIX $TARGET $BINOPTS
 		else
 			# If it's to be silent
-			../$BINVER/configure $HOST $PREFIX $TARGET $BINOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+			../$BINVER/configure $PREFIX $TARGET $BINOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
 		fi
 
 		# See if configure exited cleanly
@@ -386,10 +534,12 @@ ConfigureBin()
 	cd $BASEDIR
 }
 
+###############################################################################
 # Build binutils
-#
+###############################################################################
 # Since all builds are basically the same this one will
 # be the only one documented fully
+###############################################################################
 BuildBin()
 {
 	echo "Building binutils"
@@ -425,7 +575,9 @@ BuildBin()
 	cd $BASEDIR
 }
 
+###############################################################################
 # Configure the base gcc for building newlib
+###############################################################################
 ConfigureBaseGcc()
 {
 	echo "Configuring initial gcc"
@@ -438,9 +590,9 @@ ConfigureBaseGcc()
 			cd $BASEDIR/$GCCBUILD
 
 			if [ $SILENT -eq 0 ]; then
-				../$GCCVER/configure $HOST $TARGET $PREFIX $GCCBOPTS
+				../$GCCVER/configure $TARGET $PREFIX $GCCBOPTS
 			else
-				../$GCCVER/configure $HOST $TARGET $PREFIX $GCCBOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+				../$GCCVER/configure $TARGET $PREFIX $GCCBOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
 			fi
 
 			Result "Configuring initial gcc"
@@ -455,7 +607,9 @@ ConfigureBaseGcc()
 	cd $BASEDIR
 }
 
+###############################################################################
 # Build the base gcc for building newlib
+###############################################################################
 BuildBaseGcc()
 {
 	echo "Building initial gcc"
@@ -486,7 +640,9 @@ BuildBaseGcc()
 	cd $BASEDIR
 }
 
+###############################################################################
 # Configure newlib
+###############################################################################
 ConfigureNewlib()
 {
 	echo "Configuring Newlib"
@@ -497,9 +653,9 @@ ConfigureNewlib()
 		cd $BASEDIR/$NEWLIBBUILD
 
 		if [ $SILENT -eq 0 ]; then
-			../$NEWLIBVER/configure $HOST $TARGET $PREFIX $NEWLIBOPTS
+			../$NEWLIBVER/configure $TARGET $PREFIX $NEWLIBOPTS
 		else
-			../$NEWLIBVER/configure $HOST $TARGET $PREFIX $NEWLIBOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+			../$NEWLIBVER/configure $TARGET $PREFIX $NEWLIBOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
 		fi
 
 		Result "Configuring Newlib"
@@ -511,7 +667,9 @@ ConfigureNewlib()
 	cd $BASEDIR
 }
 
+###############################################################################
 # Build and install newlib
+###############################################################################
 BuildNewlib()
 {
 	echo "Building Newlib"
@@ -537,15 +695,17 @@ BuildNewlib()
 	cd $BASEDIR
 
 	if [[ $TARG == $DCTARG && $THREADS == "posix" ]]; then
+		###############################################################
 		# This was taken from Jim Ursetto's makefile script to set up
 		# some KOS stuff
-		#
+		###############################################################
 		# Only needed for the dreamcast/kos which is what DCTARG was
 		# created for
-		#
+		###############################################################
 		# I couldn't find any kind of license for this so below may
 		# not be covered under the license at the beginning of this
 		# file.
+		###############################################################
 		cp $KOSLOCATION/include/pthread.h $INSTALL/$DCTARG/include # KOS pthread.h is modified
 		cp $KOSLOCATION/include/sys/_pthread.h $INSTALL/$DCTARG/include/sys # to define _POSIX_THREADS
 		cp $KOSLOCATION/include/sys/sched.h $INSTALL/$DCTARG/include/sys # pthreads to kthreads mapping
@@ -555,7 +715,9 @@ BuildNewlib()
 	fi
 }
 
+###############################################################################
 # Configure the final gcc for you to use
+###############################################################################
 ConfigureFinalGcc()
 {
 	echo "Configuring final gcc"
@@ -568,9 +730,9 @@ ConfigureFinalGcc()
 		cd $BASEDIR/$GCCBUILD
 
 		if [ $SILENT -eq 0 ]; then
-			../$GCCVER/configure $HOST $TARGET $PREFIX $GCCFOPTS
+			../$GCCVER/configure $TARGET $PREFIX $GCCFOPTS
 		else
-			../$GCCVER/configure $HOST $TARGET $PREFIX $GCCFOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+			../$GCCVER/configure $TARGET $PREFIX $GCCFOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
 		fi
 
 		Result "Configuring final gcc"
@@ -582,7 +744,9 @@ ConfigureFinalGcc()
 	cd $BASEDIR
 }
 
+###############################################################################
 # Build the final gcc for you to use
+###############################################################################
 BuildFinalGcc()
 {
 	echo "Building final gcc"
@@ -609,46 +773,37 @@ BuildFinalGcc()
 	cd $BASEDIR
 }
 
-# Do it all in a relatively sane manor ;)
-All()
-{
-	echo "Making complete compiler"
-	ConfigureBin
-	BuildBin
-	ConfigureBaseGcc
-	BuildBaseGcc
-	ConfigureNewlib
-	BuildNewlib
-	ConfigureFinalGcc
-	BuildFinalGcc
-}
-
-# Build Dreamcast compiler
-BuildDreamcast()
-{
-	All
-	SetTarg2
-	All
-}
-
+###############################################################################
 # Build Kos for Dreamcast
+###############################################################################
 BuildKos()
 {
 	echo "Building kos"
+	if [ ! -d $KOSLOCATION -o ! -d $KOSLOCATION/../kos-ports ]; then
+		Download kos
+	fi
+
 	cd $KOSLOCATION
 
+	#######################################################################
+	# This is to setup the environ.sh to what our compiler is
+	#######################################################################
 	cp doc/environ.sh.sample environ.sh
 
 	# Change KOS_BASE to point to where our kos is located
 	# I do this by finding the line in the file with grep
 	# Then seding the quotes to have a \ in front
 	KOSBASELINE=$(grep "^export KOS_BASE\=" environ.sh | sed s/\"/\\\\\"/g)
+	
 	# After that I replace each / with a \/ so sed does't get confused
 	KOSBASELINE=$(echo "$KOSBASELINE" | sed s/\\\//\\\\\\//g)
+
 	# KOSLOC has the location of kos formatted for sed to read
 	KOSLOC=`echo $KOSLOCATION | sed s/\\\//\\\\\\\\\\\//g`
+
 	# Then I replace the old line with the  new one
 	sed "s/$KOSBASELINE/export KOS_BASE=\"$KOSLOC\"/" environ.sh > temp
+
 	# Then move the output from that back to envorin.sh
 	mv temp environ.sh
 
@@ -693,15 +848,104 @@ BuildKos()
 	KOSMAKELINE=$(echo $KOSMAKELINE  | sed s/\\\//\\\\\\//g)
 	sed "s/$KOSMAKELINE/export KOS_MAKE=\"$MAKE\"/" environ.sh > temp
 	mv temp environ.sh
+	#######################################################################
 
 	# Set environ.sh variables to use
 	source environ.sh
+	
 	# make kos
-	$MAKE clean
-	$MAKE
+	if [ $SILENT -eq 0 ]; then
+		$MAKE clean
+		$MAKE
+	else
+		$MAKE clean > $SENDTOWHERE 2> $ERRORTOWHERE
+		$MAKE > $SENDTOWHERE 2> $ERRORTOWHERE
+	fi
+	Result "Building KOS"
+
+	# make kos-ports
+	cd $KOSLOCATION/../kos-ports
+	if [ $SILENT -eq 0 ]; then
+		$MAKE clean
+		$MAKE
+	else
+		$MAKE clean > $SENDTOWHERE 2> $ERRORTOWHERE
+		$MAKE > $SENDTOWHERE 2> $ERRORTOWHERE
+	fi
+	Result "Building KOS ports"
 }
 
+###############################################################################
+# Do it all in a relatively sane manor ;)
+###############################################################################
+All()
+{
+	echo "Making complete compiler"
+	ConfigureBin
+	BuildBin
+	ConfigureBaseGcc
+	BuildBaseGcc
+	ConfigureNewlib
+	BuildNewlib
+	ConfigureFinalGcc
+	BuildFinalGcc
+}
+
+###############################################################################
+# Build Dreamcast compiler
+###############################################################################
+BuildDreamcast()
+{
+	All
+	SetTarg2
+	All
+	BuildKos
+}
+
+###############################################################################
+# Print the usage for this script
+###############################################################################
+Usage()
+{
+	echo "$0 usage:"
+	echo "	These options must come first"
+	echo "	dreamcast Build Gcc for Sega Dreamcast (default)"
+	echo "	genesis Build Gcc for Sega Genesis"
+	echo "	gamecube Build Gcc for Nintendo Gamecube"
+	echo
+	echo "	The following will be executed in order from left to right"
+	echo "	-ci Clean $INSTALL"
+	echo "	-c Clean $BASEDIR build files"
+	echo "	-clean Clean all"
+	echo
+	echo "	-all Configure and build all in correct order"
+	echo
+	echo "	-cb Run configure for binutils"
+	echo "	-bb Build and install binutils"
+	echo
+	echo "	-cig Run configure for initial gcc"
+	echo "	-big Build and install initial gcc"
+	echo "	-cfg Run configure for final gcc"
+	echo "	-bfg Build and install final gcc"
+	echo
+	echo "	-cn Run configure for Newlib"
+	echo "	-bn Build and install Newlib"
+	echo
+	echo "	(For Dreamcast)"
+	echo "	-t2 Set target to two so you can call above for this target"
+	echo "	-dc Same ase $0 -all -t2 -all"
+	echo "	-k Setup and build kos (Be sure KOSLOCATION is set)"
+	echo
+	echo "	-s Build silently (needs /dev/null on system, and"
+	echo "	   should be called before all that you want silent"
+	echo "	   or change $SENDTOWHERE in this script)"
+	echo
+	echo "	-e Show some examples and setable variables"
+}
+
+###############################################################################
 # Print out some examples
+###############################################################################
 Examples()
 {
 	echo "Examples:"
@@ -758,46 +1002,9 @@ Examples()
 	echo "TESTING=1 HOSTPRE=sh4-linux-uclibc $0 -dc"
 }
 
-# Print the usage for this script
-Usage()
-{
-	echo "$0 usage:"
-	echo "	These options must come first"
-	echo "	dreamcast Build Gcc for Sega Dreamcast (default)"
-	echo "	genesis Build Gcc for Sega Genesis"
-	echo "	gamecube Build Gcc for Nintendo Gamecube"
-	echo
-	echo "	The following will be executed in order from left to right"
-	echo "	-ci Clean $INSTALL"
-	echo "	-c Clean $BASEDIR build files"
-	echo "	-clean Clean all"
-	echo
-	echo "	-all Configure and build all in correct order"
-	echo
-	echo "	-cb Run configure for binutils"
-	echo "	-bb Build and install binutils"
-	echo
-	echo "	-cig Run configure for initial gcc"
-	echo "	-big Build and install initial gcc"
-	echo "	-cfg Run configure for final gcc"
-	echo "	-bfg Build and install final gcc"
-	echo
-	echo "	-cn Run configure for Newlib"
-	echo "	-bn Build and install Newlib"
-	echo
-	echo "	(For Dreamcast)"
-	echo "	-t2 Set target to two so you can call above for this target"
-	echo "	-dc Same ase $0 -all -t2 -all"
-	echo "	-k Setup and build kos (Be sure KOSLOCATION is set)"
-	echo
-	echo "	-s Build silently (needs /dev/null on system, and"
-	echo "	   should be called before all that you want silent"
-	echo "	   or change $SENDTOWHERE in this script)"
-	echo
-	echo "	-e Show some examples and setable variables"
-}
-
+###############################################################################
 # This will sort through all arguments and return 0 if it's found and 1 if not
+###############################################################################
 ParseArgs()
 {
 	# If the argument is found it executes the action the return true
@@ -888,12 +1095,20 @@ ParseArgs()
 			Setup
 			return 0
 			;;
+		"ix86")
+			SetOptions ix86
+			Setup
+			return 0
+			;;
 	esac
 
 	# Command wasn't in above so return 1	
 	return 1
 }
 
+###############################################################################
+# Setup the target install prefix and paths
+###############################################################################
 Setup()
 {
 	# Which target to use
@@ -915,6 +1130,9 @@ Setup()
 	export PATH=$INSTALL/bin:$PATH
 }
 
+###############################################################################
+# Our main function because I like C-like code
+###############################################################################
 main()
 {
 	# Set up some things the user wont ever need to
@@ -935,10 +1153,11 @@ main()
 		if ! ParseArgs $i; then
 			echo "Ignoring unsupported argument \"$i\"";
 		fi
-		SetOptions $TARG
 	done
 }
 
+###############################################################################
 # Just call main and be done with it
+###############################################################################
 main $@
 

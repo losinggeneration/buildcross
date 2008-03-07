@@ -10,7 +10,8 @@
 ###############################################################################
 #By default show output
 SILENT=0
-# Target choice: "Dreamcast", "DcLinux", "Genesis", "Gamecube", or "Ix86"
+# Target choice: "Dreamcast", "DcLinux", "Genesis", "Gamecube", "GcLinux" or
+# "Ix86"
 SYSTEM="Dreamcast"
 # Directory to build from
 BASEDIR=$(pwd)
@@ -144,6 +145,7 @@ Usage()
 	echo "	dclinux Build a Dreamcast Linux compiler"
 	echo "	genesis Build Gcc for Sega Genesis"
 	echo "	gamecube Build Gcc for Nintendo Gamecube"
+	echo "	gclinux Build a GameCub Linux compiler"
 	echo "	ix86 Build Gcc for i686"
 	echo
 	echo "	The following will be executed in order from left to right"
@@ -181,6 +183,9 @@ Usage()
 	echo "	     to save space."
 	echo "	-k Setup and build kos (Be sure KOSLOCATION is set)"
 	echo "	-dcl Build the Dreamcast Linux compiler"
+	echo "	-gcl Build the GameCube Linux compiler"
+	echo
+	echo "	-distclean Cleans All targets, archives, and dot files"
 
 }
 
@@ -354,7 +359,11 @@ ParseArgs()
 			return 0
 			;;
 		"-dcl")
-			BuildDcLinux
+			BuildLinux DcLinux
+			return 0
+			;;
+		"-gcl")
+			BuildLinux GcLinux
 			return 0
 			;;
 		"-s")
@@ -386,8 +395,16 @@ ParseArgs()
 			SetOptions Gamecube
 			return 0
 			;;
+		"gclinux")
+			SetOptions GcLinux
+			return 0
+			;;
 		"ix86")
 			SetOptions Ix86
+			return 0
+			;;
+		"-distclean")
+			DistClean
 			return 0
 			;;
 	esac

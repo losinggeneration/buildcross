@@ -206,22 +206,37 @@ ConfigureuClibc()
 {
 	LogTitle "Configuring uClibc"
 	UntarPatch $UCLIBCVER $UCLIBCPATCH
+	UntarPatch $KERNELVER $KERNELPATCH
 
 	if ! CheckExists $UCLIBCDIR/.configure; then
 		# uClibc also needs some linux-headers...
 		# So get them and extract them
-		if [ ! -e $UCLIBCDIR/.headdl ]; then
-			ExecuteCmd wget -c http://ep09.pld-linux.org/~mmazur/linux-libc-headers/linux-libc-headers-2.6.12.0.tar.bz2
-			Result "Download of linux-libc-headers ok"
-			touch $UCLIBCDIR/.headdl
-		fi
-		if [ ! -e $UCLIBCDIR/.headtar ]; then
-			tar xfj linux-libc-headers-2.6.12.0.tar.bz2 -C $TARG
-			cd $TARG/linux-libc-headers-2.6.12.0/include
-			ln -s asm-sh asm
-			touch $BASEDIR/$UCLIBCDIR/.headtar
-			cd $BASEDIR 
-		fi
+		#if [ ! -e $UCLIBCDIR/.headdl ]; then
+		#	ExecuteCmd wget -c http://ep09.pld-linux.org/~mmazur/linux-libc-headers/linux-libc-headers-2.6.12.0.tar.bz2
+		#	Result "Download of linux-libc-headers ok"
+		#	touch $UCLIBCDIR/.headdl
+		#fi
+		#if [ ! -e $UCLIBCDIR/.headtar ]; then
+		#	tar xfj linux-libc-headers-2.6.12.0.tar.bz2 -C $TARG
+		#	touch $BASEDIR/$UCLIBCDIR/.headtar
+		#	cd $TARG/linux-libc-headers-2.6.12.0/include
+		cd $TARG/$KERNELVER/include
+
+		# Make sure we link to the correct asm for the target
+		case $TARG in
+			"$DCLTARG")
+				ExecuteCmd ln -s asm-sh asm
+				;;
+			"$GCLTARG")
+				ExecuteCmd ln -s asm-ppc asm
+				;;
+			*)
+				LogError "You shouldn't try building uClibc without a known target"
+				;;
+		esac
+
+		cd $BASEDIR 
+		#fi
 
 		mkdir -p $UCLIBCHDIR/usr/include
 		mkdir -p $UCLIBCHDIR/usr/lib
@@ -234,7 +249,9 @@ ConfigureuClibc()
 		BASELINE=$(echo "$BASEDIR/$TARG" | sed s/\\\//\\\\\\//g)
 		UCLIBCLINE=$(echo "$UCLIBCHDIR" | sed s/\\\//\\\\\\//g)
 
-		sed "s/KERNELSOURCEDIR/$BASELINE\/linux-libc-headers-2.6.12.0/" $PATCHDIR/uclibc-config | sed "s/COMPILERPREFIX/$TARG-/" | sed "s/SHAREDLIBPREFIX/$UCLIBCLINE\//" |  sed "s/RUNDEVPREFIX/$UCLIBCLINE\/usr/" > .config
+		echo $TARG-
+
+		sed "s/KERNELSOURCEDIR/$BASELINE\/$KERNELVER/" $PATCHDIR/uclibc-config | sed "s/COMPILERPREFIX/$TARG-/" | sed "s/SHAREDLIBPREFIX/$UCLIBCLINE\//" |  sed "s/RUNDEVPREFIX/$UCLIBCLINE\/usr/" > .config
 
 		ExecuteCmd make PREFIX=$UCLIBCHDIR DEVEL_PREFIX=/usr/ RUNTIME_PREFIX=$UCLIBCHDIR pregen install_dev
 		Result "Configuring uClibc"
@@ -539,13 +556,13 @@ BuildCleaningDreamcast()
 }
 
 ###############################################################################
-# Build the Dreamcast Linux compiler
+# Build the Linux compiler
 ###############################################################################
-BuildDcLinux()
+BuildLinux()
 {
-	LogTitle "Making complete Dreamcast Linux compiler"
+	LogTitle "Making complete $1 Linux compiler"
 	# Make sure we're using the right target	
-	SetOptions DcLinux
+	SetOptions $1
 	ConfigureBin
 	BuildBin
 	# uClibc needs to be configured before Gcc

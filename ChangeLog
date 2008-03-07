@@ -104,3 +104,13 @@ Version 1.5:
 	-Made some changes to building KOS to allow ix86 to build KOS too.
 	-Added ix86 to to top of buildcross options. Oops.
 	-Removed some patches that were not needed.
+
+Version 1.6:
+	-Added GameCube Linux target and uses uClibc.
+	-Imported some patches for gclinux.
+	-Changed BuildDcLinux to BuildLinux.
+	-Moved kernel headers to download/patch the normal way. (AKA cleanup.)
+	-ConfigureuClibc now is extendable for other platforms with a case
+	 statement.
+	-Added -distclean option to remove sources, dot files, and file
+	 archives. Things needed to be done either before a release mainly.

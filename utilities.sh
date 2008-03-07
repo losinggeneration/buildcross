@@ -167,6 +167,13 @@ Download()
 				touch .$UCLIBCVER-downloaded
 			fi
 			;;
+		"$KERNELVER")
+			if ! CheckExists .$KERNELVER-downloaded; then
+				wget -c $WGETOUT http://ep09.pld-linux.org/~mmazur/linux-libc-headers/linux-libc-headers-2.6.12.0.tar.bz2
+				
+				touch .$KERNELVER-downloaded
+			fi
+			;;
 		"kos")
 			if ! CheckExists $TARG/.kos-downloaded; then
 				cd $KOSLOCATION/..
@@ -292,5 +299,29 @@ CheckExists()
 	fi
 
 	return 1
+}
+
+###############################################################################
+# Mainly used to prepare for a release by cleaning all downloaded files and 
+# removing all target directories.
+###############################################################################
+DistClean()
+{
+	# I'd hate to see this in any other directory
+	cd $BASEDIR
+	find . -name "*~" -exec rm {} \;
+	ExecuteCmd rm -fr .linux-* .binutils-* .gcc-* .uClibc-* *.bz2 *.gz
+	SetOptions Dreamcast
+	ExecuteCmd rm -fr $TARG
+	SetOptions Gamecube
+	ExecuteCmd rm -fr $TARG
+	SetOptions DcLinux
+	ExecuteCmd rm -fr $TARG
+	SetOptions Genesis
+	ExecuteCmd rm -fr $TARG
+	SetOptions GcLinux
+	ExecuteCmd rm -fr $TARG
+	SetOptions Ix86
+	ExecuteCmd rm -fr $TARG
 }
 

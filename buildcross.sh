@@ -82,7 +82,7 @@ fi
 # Which thread model gcc should use
 if [ "x$THREADS" == "x" ]; then
 	# single, posix, or blank for gcc to choose the default threading
-	THREADS=""
+	THREADS="yes"
 fi
 
 # Which languages gcc should build
@@ -570,14 +570,12 @@ BuildKos()
 	echo "Building kos"
 	cd $KOSLOCATION
 
-	# Change the standard sh-elf and arm-elf in the file
-	sed "s/sh-elf/$SHELF/" environ.sh | sed "s/arm-elf/$ARMELF/" > temp
-	mv temp enviorn.sh
+	cp doc/environ.sh.sample environ.sh
 
 	# Change KOS_BASE to point to where our kos is located
 	# I do this by finding the line in the file with grep
 	# Then seding the quotes to have a \ in front
-	KOSBASELINE=$(grep KOS_BASE\= environ.sh | sed s/\"/\\\\\"/g)
+	KOSBASELINE=$(grep "^export KOS_BASE\=" environ.sh | sed s/\"/\\\\\"/g)
 	# After that I replace each / with a \/ so sed does't get confused
 	KOSBASELINE=$(echo "$KOSBASELINE" | sed s/\\\//\\\\\\//g)
 	# KOSLOC has the location of kos formatted for sed to read
@@ -585,21 +583,48 @@ BuildKos()
 	# Then I replace the old line with the  new one
 	sed "s/$KOSBASELINE/export KOS_BASE=\"$KOSLOC\"/" environ.sh > temp
 	# Then move the output from that back to envorin.sh
-	mv temp enviorn.sh
+	mv temp environ.sh
 
 	# Same as above for DC_ARM_BASE, but we use where the compiler is
 	# installed instead
-	DCBASELINE=$(grep "DC_ARM_BASE\=" environ.sh | sed s/\"/\\\\\"/g)
-	DCBASELINE=$(echo "$DCBASELINE" | sed s/\\\//\\\\\\//g)
+	ARMBASELINE=$(grep "^export DC_ARM_BASE\=" environ.sh | sed s/\"/\\\\\"/g)
+	ARMBASELINE=$(echo "$ARMBASELINE" | sed s/\\\//\\\\\\//g)
 	COMPLOC=`echo $INSTALL | sed s/\\\//\\\\\\\\\\\//g`
-	sed "s/$DCBASELINE/export DC_ARM_BASE=\"$COMPLOC\"/" environ.sh > temp 
+	sed "s/$ARMBASELINE/export DC_ARM_BASE=\"$COMPLOC\"/" environ.sh > temp 
 	mv temp environ.sh
 	
+	# Same as above for DC_ARM_BASE, but we use where the compiler is
+	# installed instead
+	ARMPREFIXLINE=$(grep "^export DC_ARM_PREFIX\=" environ.sh | sed s/\"/\\\\\"/g)
+	ARMPREFIXLINE=$(echo "$ARMPREFIXLINE" | sed s/\\\//\\\\\\//g)
+	sed "s/$ARMPREFIXLINE/export DC_ARM_PREFIX=\"$ARMELF\"/" environ.sh > temp
+	mv temp environ.sh
+
+	
 	# Same as above but for KOS_CC_BASE
-	KOSCCBASELINE=$(grep "^export KOS_CC_BASE\=" enviorn.sh | sed s/\"/\\\\\"/g)
+	KOSCCBASELINE=$(grep "^export KOS_CC_BASE\=" environ.sh | sed s/\"/\\\\\"/g)
 	KOSCCBASELINE=$(echo $KOSCCBASELINE | sed s/\\\//\\\\\\//g)
-	KOSCCBASELINE=$(echo $KOSCCBASELINE | sed "s/\ # DC//")
 	sed "s/$KOSCCBASELINE/export KOS_CC_BASE=\"$COMPLOC\"/g" environ.sh > temp
+	mv temp environ.sh
+
+	# Change the standard dc to our prefix
+	KOSCCPREFIXLINE=$(grep "^export KOS_CC_PREFIX=" environ.sh | sed s/\"/\\\\\"/g)
+	KOSCCPREFIXLINE=$(echo $KOSCCPREFIXLINE | sed s/\\\//\\\\\\//g)
+	sed "s/$KOSCCPREFIXLINE/export KOS_CC_PREFIX=\"$SHELF\"/g" environ.sh > temp
+	mv temp environ.sh
+
+	# Change the PATH expansion line
+	KOSPATHLINE=$(grep "^export PATH=" environ.sh | sed s/\"/\\\\\"/g)
+	KOSPATHLINE=$(echo $KOSPATHLINE | sed s/\\\//\\\\\\//g)
+	# The sample uses ${KOS_CC_BASE}/bin:/usr/local/dc/bin which means on a standard
+	# install it's going to be the same
+	sed "s/$KOSPATHLINE/export PATH=\"\${PATH}:\${KOS_CC_BASE}\/bin\"/" environ.sh > temp
+	mv temp environ.sh
+
+	# Change the MAKE variable to match the one here
+	KOSMAKELINE=$(grep "^export KOS_MAKE=" environ.sh | sed s/\"/\\\\\"/g)
+	KOSMAKELINE=$(echo $KOSMAKELINE  | sed s/\\\//\\\\\\//g)
+	sed "s/$KOSMAKELINE/export KOS_MAKE=\"$MAKE\"/" environ.sh > temp
 	mv temp environ.sh
 
 	# Set environ.sh variables to use
@@ -619,7 +644,7 @@ Examples()
 	echo
 	echo "Set where KOS is located for Dreamcast build"
 	echo "KOSLOCATION defaults to $BASEDIR/kos"
-	echo "KOSLOCATION=\"~/dreamcast/kos\" $0 -dc"
+	echo "KOSLOCATION=\"~/dreamcast/kos\" $0 -dc -k"
 	echo 
 	echo "Build Dreamcast chain and install it"
 	echo "$0 -dc"
@@ -638,7 +663,7 @@ Examples()
 	echo "$0 -ci -all"
 	echo
 	echo "Setable variables:"
-	echo "KOSLOCATION	For setting where kos is if not in current directory"
+	echo "KOSLOCATION	For setting where \"kos\" is if not in current directory"
 	echo "SENDTOWHERE	For setting where to send output (use absolute path names)"
 	echo "ERRORTOWHERE	Same as above but for errors"
 	echo "TESTING		Setting it equal to 1 to install compiler to ./testcompiler"
@@ -691,7 +716,7 @@ Usage()
 	echo "	(For Dreamcast)"
 	echo "	-t2 Set target to two so you can call above for this target"
 	echo "	-dc Same ase $0 -all -t2 -all"
-	echo "	-k Build kos (Be sure KOSLOCATION is set by command line or in script)"
+	echo "	-k Setup and build kos (Be sure KOSLOCATION is set)"
 	echo
 	echo "	-s Build silently (needs /dev/null on system, and"
 	echo "	   should be called before all that you want silent"

@@ -22,7 +22,7 @@ Version 1.2:
 
 Version 1.3:
 	-Added support for downloading sources if they aren't here instead of
-	 just quitting. Still quits if unable to downland files like one would
+	 just quitting. Still quits if unable to download files like one would
 	 expect. Wget is needed for downloading Binutils, Gcc, and NewLib. SVN
 	 is needed for getting KOS.
 	-Moved some things around for easier reading of the code.
@@ -38,3 +38,27 @@ Version 1.3.1:
 Version 1.3.2:
 	-Fixed bug where it wouldn't patch after a download.
 	-Did some simplifications to the Untar/UntarPatch functions.
+
+Version 1.4:
+	-Bumped Binutils to version 2.17.
+	-Arm compiler for Dreamcast now builds without newlib and c++ by
+	 default.
+	-More than one patch can be applied by buildcross now. For more
+	 information read README in patches directory.
+	-Added -allc for building compiler and removing sources and objects
+	 after each is built.
+	-Added -dcc for building the dreamcast compiler, but it will clean the
+	 source and objects after each is successfully built (If interrupted,
+	 it will still resume where it left off. -c must be run to start over)
+	-Added -i to rerun make installs even if .installed is found.
+	-Remove's message now includes that it's removing .*config* and
+	 .*installed*
+	-Added examples for the two new options.
+	-Changed manual DC build example to not include newlib and gcc final
+	 for ARM.
+	-Merged Setup function into SetupOptions (at end) since it's only
+	 called after setting options anyways.
+	-Fixed bug that might cause ix86 to not be able to be cross compiled.
+	-Added patches/ix86 for completeness.
+	-Added a kos patch which adds -R.stack to kos-objcopy if -O binary is
+	 given in the command line. Patch disabled by default.

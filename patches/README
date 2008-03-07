@@ -1,0 +1,12 @@
+Basics:
+	Multiple patches can be applied as long as they follow the format:
+	-NAMEVER-* for Binutils, Gcc, and Newlib. NAMEVER should be the same name/version as the one you plan on patching.
+	-kos-* and kos-ports-* for kos and kos-ports respectively (who would have guessed that one?)
+
+	So the default patches are gcc-3.4.6-buildcross.diff, but you could add say gcc-3.4.1-mypatch1.diff and gcc-3.4.1-patch2.diff if you wanted. The key things to keep in mind is:
+	-make sure the patch has the same name and version as the source.
+	-make sure a - follows the version number in the patch name.
+	-put whatever you want after version- Although I would suggest a short description, but it's not necessary.
+
+Broken and disabled patches:
+	Patches with broken or disabled in them (regardless of case) will not be applied, thus ignored. This way if a patch is suspected to be causing problems you can disable it or call it broken so it does not get applied.

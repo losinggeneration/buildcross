@@ -46,12 +46,6 @@
 # Optional:
 # Add your target to Usage
 ###############################################################################
-# Even though I'm relatively pleased with this script, there is one limitation
-# that I haven't bothered to address which is that the patches must all be in
-# one file (the same as the file-version). This could be fixed but I'm unsure
-# if there's a big enough need for that. Related to this is that gcc/binutils/
-# newlib will have to be removed before it's patched again.
-###############################################################################
 
 ###############################################################################
 # Options you may want to change
@@ -62,28 +56,16 @@ SILENT=0
 # Gcc version to build
 GCCVER="gcc-3.4.6"
 # Binutils version to build
-BINVER="binutils-2.16.1"
+BINVER="binutils-2.17"
 # Newlib version to build
 NEWLIBVER="newlib-1.13.0"
 # Target choice: "Dreamcast", "Genesis", "Gamecube", or "ix86"
 SYSTEM="Dreamcast"
 # Directory to build from
 BASEDIR=`pwd`
-###############################################################################
-
-###############################################################################
 # Where the patches are
-###############################################################################
-# Patches should be a single file
 PATCHBASEDIR="$BASEDIR/patches"
-# Binutils patch
-BINPATCH="$BINVER.diff"
-# Gcc patch
-GCCPATCH="$GCCVER.diff"
-# Newlib patch
-NEWLIBPATCH="$NEWLIBVER.diff"
 ###############################################################################
-
 
 ###############################################################################
 # Compiler prefixes
@@ -114,6 +96,8 @@ if [ "x$SENDTOWHERE" == "x" ]; then
 	#SENDTOWHERE="$BASEDIR/output.log"
 	# To send to nowhere
 	SENDTOWHERE="/dev/null"
+else
+	rm $SENDTOWHERE
 fi
 
 # Where to send errors from make and configure
@@ -122,6 +106,8 @@ if [ "x$ERRORTOWHERE" == "x" ]; then
 	#ERRORTOWHERE="$BASEDIR/error.log"
 	# To send errors to nowhere
 	ERRORTOWHERE="/dev/null"
+else
+	rm $ERRORTOWHERE
 fi
 
 # Which thread model gcc should use
@@ -160,6 +146,12 @@ fi
 if [ "x$BCCFLAGS" == "x" ]; then
 	BCCFLAGS=""
 fi
+
+# We only need a single pass for the arm compiler for the Dreamcast
+if [ "x$TWOPASS" == "x" ]; then
+	TWOPASS=0
+fi
+
 ###############################################################################
 
 ###############################################################################
@@ -250,13 +242,13 @@ SetOptions()
 			# Where to install to
 			INSTALL="/usr/local/ix86"
 			# Binutils options
-			BINOPTS="--disable-nls --with-sysroot=$INSTALL"
+			BINOPTS="$HOST --disable-nls --with-sysroot=$INSTALL"
 			# Gcc base options
-			GCCBOPTS="--with-newlib --disable-nls --without-headers --disable-threads --enable-languages=c"
+			GCCBOPTS="$HOST --with-newlib --disable-nls --without-headers --disable-threads --enable-languages=c"
 			# Final Gcc options
-			GCCFOPTS="--with-newlib --disable-nls --enable-symvers=gnu --enable-threads=$THREADS --enable-languages=$LANGUAGES"
+			GCCFOPTS="$HOST --with-newlib --disable-nls --enable-symvers=gnu --enable-threads=$THREADS --enable-languages=$LANGUAGES"
 			# Newlib options
-			NEWLIBOPTS=""
+			NEWLIBOPTS="$HOST"
 			# Target
 			IXTARG="i686-elf"
 			SHELF="i686-elf"
@@ -266,6 +258,17 @@ SetOptions()
 			;;
 
 	esac
+	
+	# Binutils patches
+	BINPATCH=$(ls $PATCHDIR/$BINVER-* 2> /dev/null)
+	# Gcc patches
+	GCCPATCH=$(ls $PATCHDIR/$GCCVER-* 2> /dev/null)
+	# Newlib patches
+	NEWLIBPATCH=$(ls $PATCHDIR/$NEWLIBVER-* 2> /dev/null)
+	# Kos patches
+	KOSPATCH=$(ls $PATCHDIR/kos-* 2> /dev/null)
+	# Kos-Ports patches
+	KOSPORTSPATCH=$(ls $PATCHDIR/kos-ports-* 2> /dev/null)
 
 	# This is here for debugging the script without clobbering the main
 	# install
@@ -273,6 +276,27 @@ SetOptions()
 		# For testing uncomment this to put the compiler in a tempdir
 		INSTALL="$BASEDIR/testcompiler"
 	fi
+
+	# Now we can setup everything else by the variable defined above
+	################################################################
+	# Which target to use
+	TARG="$TARG1"
+	# The target for configure
+	TARGET="--target=$TARG"
+	# The prefix to install for configure
+	PREFIX="--prefix=$INSTALL"
+
+	BINBUILD="$TARG-binbuildelf"
+	GCCBUILD="$TARG-gccbuildelf"
+	NEWLIBBUILD="$TARG-newlibbuildelf"
+	
+	# If the install directory doesn't exist make it
+	if [ ! -d $INSTALL ]; then
+		mkdir $INSTALL
+	fi
+
+	# Make sure our install/bin is in the path before our current path
+	export PATH=$INSTALL/bin:$PATH
 }
 
 ###############################################################################
@@ -313,6 +337,8 @@ CreateDir()
 # 1) Try to create directories if needed
 # 2) If untar returns true than patch it
 # Otherwise it does nothing
+# $1 is the source directory name
+# $2-$* is the patches (Gcc, Binutils, Newlib, kos, kos-ports)
 ###############################################################################
 UntarPatch()
 {
@@ -322,16 +348,15 @@ UntarPatch()
 	# and that we got to touch that it's untared
 	if [ ! -d $1 -o ! -e $1/.untared ]; then
 		Untar $1
+		# Result is here because Untar might have 1 recursive call
 		Result "Untaring"
 		# A quick way to tell if we need to untar or not
 		touch $1/.untared
 	fi
 	
-	if ! CheckExists $1/.patched; then 
-		Patch $2 $1
-		Result "Patching"
-		touch $1/.patched
-	fi
+	# We send all parameters because the first is $1 and the rest
+	# are the patches, the format we want.
+	Patch $*
 }
 
 ###############################################################################
@@ -402,14 +427,14 @@ Download()
 				if [ $SILENT -eq 0 ]; then
 					svn co https://svn.sourceforge.net/svnroot/cadcdev/kos
 				else
-					svn co https://svn.sourceforge.net/svnroot/cadcdev/kos > $SENDTOWHERE 2> $ERRORTOWHERE
+					svn co https://svn.sourceforge.net/svnroot/cadcdev/kos >> $SENDTOWHERE 2>> $ERRORTOWHERE
 				fi
 			fi
 			if [ ! -d $KOSLOCATION/../kos-ports ]; then
 				if [ $SILENT -eq 0 ]; then
 					svn co https://svn.sourceforge.net/svnroot/cadcdev/kos-ports
 				else
-					svn co https://svn.sourceforge.net/svnroot/cadcdev/kos-ports > $SENDTOWHERE 2> $ERRORTOWHERE
+					svn co https://svn.sourceforge.net/svnroot/cadcdev/kos-ports >> $SENDTOWHERE 2>> $ERRORTOWHERE
 				fi
 			fi
 			;;
@@ -422,14 +447,38 @@ Download()
 
 ###############################################################################
 # Try to patch the file
+# $1 is the patches
+# $2 is the source directory to be patched
 ###############################################################################
 Patch()
 {
-	# if the patch exists.... You get the idea
-	if [ -e $PATCHDIR/$1 ]; then
-		echo "Patching $2"
-		cd $BASEDIR/$2
-		patch -p1 -i $PATCHDIR/$1
+	if [ $1 == "kos" ]; then
+		LOC=$KOSLOCATION
+	elif [ $1 == "kos-ports" ]; then
+		LOC=$KOSLOCATION/../kos-ports
+	else
+		LOC=$BASEDIR/$1
+	fi
+	# We need to get past the name/version so shift the params one
+	shift 1
+
+	if ! CheckExists $LOC/.patched; then 
+		cd $LOC
+		# Go through all parameters passed here which is
+		# $(ls patches/sys/namever-*)
+		for i in $*; do
+			# Only patch if the if does not include disabled or broken
+			# This looks strange at first, but if grep doesn't include the
+			# word, it returns nothing, thus x`grep ...` == x if the words
+			# aren't there.
+			if [[ x`echo $i | grep -i disabled` == "x" && x`echo $i | grep -i broken` == "x" ]]; then
+				echo "Patching $i"
+				patch -p1 -i $i
+				Result "Patching with patch $i"
+			fi
+		done
+
+		touch .patched
 		cd $BASEDIR
 	fi
 }
@@ -439,8 +488,17 @@ Patch()
 ###############################################################################
 Remove()
 {
-	echo "Removing contens of $BASEDIR/$1/*"
+	echo "Removing contens of $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*"
 	rm -fr $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*
+}
+
+###############################################################################
+# Remove the contents of a directory, but leave that if it's been built or not
+###############################################################################
+CleaningRemove()
+{
+	echo "Removing contens of $BASEDIR/$1/*"
+	rm -fr $BASEDIR/$1/* 
 }
 
 ###############################################################################
@@ -513,7 +571,7 @@ ConfigureBin()
 			../$BINVER/configure $PREFIX $TARGET $BINOPTS
 		else
 			# If it's to be silent
-			../$BINVER/configure $PREFIX $TARGET $BINOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+			../$BINVER/configure $PREFIX $TARGET $BINOPTS >> $SENDTOWHERE 2>> $ERRORTOWHERE
 		fi
 
 		# See if configure exited cleanly
@@ -550,9 +608,9 @@ BuildBin()
 		else
 			# If it's a quiet build and install, send the output to
 			# $SENDTOWHERE and $ERRORTOWHERE
-			$MAKE all > $SENDTOWHERE 2> $ERRORTOWHERE
+			$MAKE all >> $SENDTOWHERE 2>> $ERRORTOWHERE
 			Result "$MAKE all"
-			$MAKE install > $SENDTOWHERE 2> $ERRORTOWHERE
+			$MAKE install >> $SENDTOWHERE 2>> $ERRORTOWHERE
 		fi
 
 		# See if the makes exited cleanly
@@ -585,7 +643,7 @@ ConfigureBaseGcc()
 			if [ $SILENT -eq 0 ]; then
 				../$GCCVER/configure $TARGET $PREFIX $GCCBOPTS
 			else
-				../$GCCVER/configure $TARGET $PREFIX $GCCBOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+				../$GCCVER/configure $TARGET $PREFIX $GCCBOPTS >> $SENDTOWHERE 2>> $ERRORTOWHERE
 			fi
 
 			Result "Configuring initial gcc"
@@ -616,9 +674,9 @@ BuildBaseGcc()
 				Result "$MAKE all-gcc"
 				$MAKE install-gcc 
 			else
-				$MAKE all-gcc > $SENDTOWHERE 2> $ERRORTOWHERE
+				$MAKE all-gcc >> $SENDTOWHERE 2>> $ERRORTOWHERE
 				Result "$MAKE all-gcc"
-				$MAKE install-gcc > $SENDTOWHERE 2> $ERRORTOWHERE
+				$MAKE install-gcc >> $SENDTOWHERE 2>> $ERRORTOWHERE
 			fi
 	
 			Result "Building initial gcc"
@@ -648,7 +706,7 @@ ConfigureNewlib()
 		if [ $SILENT -eq 0 ]; then
 			../$NEWLIBVER/configure $TARGET $PREFIX $NEWLIBOPTS
 		else
-			../$NEWLIBVER/configure $TARGET $PREFIX $NEWLIBOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+			../$NEWLIBVER/configure $TARGET $PREFIX $NEWLIBOPTS >> $SENDTOWHERE 2>> $ERRORTOWHERE
 		fi
 
 		Result "Configuring Newlib"
@@ -674,9 +732,9 @@ BuildNewlib()
 			Result "$MAKE"
 			$MAKE install
 		else
-			$MAKE > $SENDTOWHERE 2> $ERRORTOWHERE
+			$MAKE >> $SENDTOWHERE 2>> $ERRORTOWHERE
 			Result "$MAKE"
-			$MAKE install > $SENDTOWHERE 2> $ERRORTOWHERE
+			$MAKE install >> $SENDTOWHERE 2>> $ERRORTOWHERE
 		fi
 
 		Result "Building Newlib"
@@ -687,7 +745,7 @@ BuildNewlib()
 
 	cd $BASEDIR
 
-	if [[ $TARG == $DCTARG && $THREADS == "posix" ]]; then
+	if [[ $TARG == $DCTARG && ($THREADS == "posix" || $THREADS == "yes") ]]; then
 		###############################################################
 		# This was taken from Jim Ursetto's makefile script to set up
 		# some KOS stuff
@@ -705,6 +763,24 @@ BuildNewlib()
 		ln -nsf $KOSLOCATION/include/kos $INSTALL/$DCTARG/include # so KOS includes are available as kos/file.h
 		ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/arch $INSTALL/$DCTARG/include # kos/thread.h requires arch/arch.h
 		ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/dc $INSTALL/$DCTARG/include # arch/arch.h requires dc/video.h
+		
+		if [ $SILENT -eq 0 ]; then
+			echo cp $KOSLOCATION/include/pthread.h $INSTALL/$DCTARG/include
+			echo cp $KOSLOCATION/include/sys/_pthread.h $INSTALL/$DCTARG/include/sys
+			echo cp $KOSLOCATION/include/sys/sched.h $INSTALL/$DCTARG/include/sys
+			echo ln -nsf $KOSLOCATION/include/kos $INSTALL/$DCTARG/include
+			echo ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/arch $INSTALL/$DCTARG/include
+			echo ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/dc $INSTALL/$DCTARG/include
+			echo "Fixed some threading stuff for kos"
+		else
+			echo cp $KOSLOCATION/include/pthread.h $INSTALL/$DCTARG/include >> $SENDTOWHERE 2>> $ERRORTOWHERE
+			echo cp $KOSLOCATION/include/sys/_pthread.h $INSTALL/$DCTARG/include/sys >> $SENDTOWHERE 2>> $ERRORTOWHERE
+			echo cp $KOSLOCATION/include/sys/sched.h $INSTALL/$DCTARG/include/sys >> $SENDTOWHERE 2>> $ERRORTOWHERE
+			echo ln -nsf $KOSLOCATION/include/kos $INSTALL/$DCTARG/include >> $SENDTOWHERE 2>> $ERRORTOWHERE
+			echo ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/arch $INSTALL/$DCTARG/include >> $SENDTOWHERE 2>> $ERRORTOWHERE
+			echo ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/dc $INSTALL/$DCTARG/include >> $SENDTOWHERE 2>> $ERRORTOWHERE
+			echo "Fixed some threading stuff for kos" >> $SENDTOWHERE 2>> $ERRORTOWHERE
+		fi
 	fi
 }
 
@@ -725,7 +801,7 @@ ConfigureFinalGcc()
 		if [ $SILENT -eq 0 ]; then
 			../$GCCVER/configure $TARGET $PREFIX $GCCFOPTS
 		else
-			../$GCCVER/configure $TARGET $PREFIX $GCCFOPTS > $SENDTOWHERE 2> $ERRORTOWHERE
+			../$GCCVER/configure $TARGET $PREFIX $GCCFOPTS >> $SENDTOWHERE 2>> $ERRORTOWHERE
 		fi
 
 		Result "Configuring final gcc"
@@ -752,9 +828,9 @@ BuildFinalGcc()
 			Result "$MAKE all"
 			$MAKE install
 		else
-			$MAKE all > $SENDTOWHERE 2> $ERRORTOWHERE
+			$MAKE all >> $SENDTOWHERE 2>> $ERRORTOWHERE
 			Result "$MAKE all"
-			$MAKE install > $SENDTOWHERE 2> $ERRORTOWHERE
+			$MAKE install >> $SENDTOWHERE 2>> $ERRORTOWHERE
 		fi
 
 		Result "Building final gcc"
@@ -846,24 +922,27 @@ BuildKos()
 	# Set environ.sh variables to use
 	source environ.sh
 	
+	Patch kos $KOSPATCH
+	cd $KOSLOCATION
 	# make kos
 	if [ $SILENT -eq 0 ]; then
 		$MAKE clean
 		$MAKE
 	else
-		$MAKE clean > $SENDTOWHERE 2> $ERRORTOWHERE
-		$MAKE > $SENDTOWHERE 2> $ERRORTOWHERE
+		$MAKE clean >> $SENDTOWHERE 2>> $ERRORTOWHERE
+		$MAKE >> $SENDTOWHERE 2>> $ERRORTOWHERE
 	fi
 	Result "Building KOS"
 
+	Patch kos-ports $KOSPORTSPATCH
 	# make kos-ports
 	cd $KOSLOCATION/../kos-ports
 	if [ $SILENT -eq 0 ]; then
 		$MAKE clean
 		$MAKE
 	else
-		$MAKE clean > $SENDTOWHERE 2> $ERRORTOWHERE
-		$MAKE > $SENDTOWHERE 2> $ERRORTOWHERE
+		$MAKE clean >> $SENDTOWHERE 2>> $ERRORTOWHERE
+		$MAKE >> $SENDTOWHERE 2>> $ERRORTOWHERE
 	fi
 	Result "Building KOS ports"
 }
@@ -885,13 +964,74 @@ All()
 }
 
 ###############################################################################
+# Do it all, and keep it cleaned up while you're at it
+###############################################################################
+CleaningAll()
+{
+	echo "Making complete compiler"
+	ConfigureBin
+	BuildBin
+	CleaningRemove $BINBUILD
+	rm -fr $BASEDIR/$BINVER
+	ConfigureBaseGcc
+	BuildBaseGcc
+	CleaningRemove $GCCBUILD
+	rm -fr $BASEDIR/$GCCVER
+	ConfigureNewlib
+	BuildNewlib
+	CleaningRemove $NEWLIBBUILD
+	rm -fr $BASEDIR/$NEWLIBVER
+	ConfigureFinalGcc
+	BuildFinalGcc
+	CleaningRemove $GCCBUILD
+	rm -fr $BASEDIR/$GCCVER
+}
+
+###############################################################################
 # Build Dreamcast compiler
 ###############################################################################
 BuildDreamcast()
 {
 	All
 	SetTarg2
-	All
+
+	# The default is to do a single pass without newlib for target 2 (arm)
+	if [ $TWOPASS -eq 1 ]; then
+		All
+	else
+		ConfigureBin
+		BuildBin
+		ConfigureBaseGcc
+		BuildBaseGcc
+	fi
+
+	BuildKos
+}
+
+
+
+###############################################################################
+# Build Dreamcast compiler, and save some space when building
+###############################################################################
+BuildCleaningDreamcast()
+{
+	CleaningAll
+	SetTarg2
+
+	# The default is to do a single pass without newlib for target 2 (arm)
+	if [ $TWOPASS -eq 1 ]; then
+		CleaningAll
+	else
+		ConfigureBin
+		BuildBin
+		CleaningRemove $BINBUILD
+		rm -fr $BASEDIR/$BINVER
+		ConfigureBaseGcc
+		BuildBaseGcc
+		CleaningRemove $GCCBUILD
+		rm -fr $BASEDIR/$GCCVER
+	fi
+
 	BuildKos
 }
 
@@ -912,6 +1052,8 @@ Usage()
 	echo "	-clean Clean all"
 	echo
 	echo "	-all Configure and build all in correct order"
+	echo "	-allc Configure and build all in correct order, but clean"
+	echo "	      objects and remove source after each is built"
 	echo
 	echo "	-cb Run configure for binutils"
 	echo "	-bb Build and install binutils"
@@ -924,16 +1066,21 @@ Usage()
 	echo "	-cn Run configure for Newlib"
 	echo "	-bn Build and install Newlib"
 	echo
-	echo "	(For Dreamcast)"
-	echo "	-t2 Set target to two so you can call above for this target"
-	echo "	-dc Same ase $0 -all -t2 -all"
-	echo "	-k Setup and build kos (Be sure KOSLOCATION is set)"
-	echo
 	echo "	-s Build silently (needs /dev/null on system, and"
 	echo "	   should be called before all that you want silent"
 	echo "	   or change $SENDTOWHERE in this script)"
 	echo
 	echo "	-e Show some examples and setable variables"
+	echo
+	echo "	-i Will force make/make install to be rerun"
+	echo
+	echo "	(For Dreamcast)"
+	echo "	-t2 Set target to two so you can call above for this target"
+	echo "	-dc Same ase $0 -all -t2 -all"
+	echo "	-dcc Remove src directory and objects after each is built to"
+	echo "	     to save space."
+	echo "	-k Setup and build kos (Be sure KOSLOCATION is set)"
+
 }
 
 ###############################################################################
@@ -955,10 +1102,25 @@ Examples()
 	echo
 	echo "Same as above but clean after each is compiled (I know it's long)"
 	echo "It's only needed if you're pretty short on space"
-	echo "$0 -cb -bb -c -cig -big -c -cn -bn -c -cfg -bfg -c -t2 -cb -bb -c -cig -big -c -cn -bn -c -cfg -bfg -c"
+	echo "$0 -cb -bb -c -cig -big -c -cn -bn -c -cfg -bfg -c -t2 -cb -bb -c -cig -big"
+	echo
+	echo "Do the same as above but with less typing (or copying)"
+	echo "$0 -dcc"
+	echo "Not that it's not exactly the same because this will leave if each"
+	echo "is configured and installed or not. Run $0 -c to remove these from"
+	echo "the build directories."
+	echo
+	echo "This does the same thing only it builds Arm with newlib and C++"
+	echo "$0 -cb -bb -c -cig -big -c -cn -bn -c -cfg -bfg -c -t2 -cb -bb -c -cig -big -c -cn -bn -c -cfg -bfg -c"	
+	echo
+	echo "Againg but with shorter syntax"
+	echo "TWOPASS=1 $0 -dcc"
 	echo
 	echo "Same as above but clean after each arch is built"
 	echo "$0 -all -c -t2 -all -c"
+	echo
+	echo "More of the same, but cleans and removes source after each is built"
+	echo "$0 -allc -t2 -allc"
 	echo
 	echo "This is assuming binutils and the base gcc has been built"
 	echo "$0 -cn -bn -cfg -bfg -c"
@@ -968,6 +1130,8 @@ Examples()
 	echo
 	echo "Setable variables:"
 	echo "KOSLOCATION	For setting where \"kos\" is if not in current directory"
+	echo "TWOPASS		To build the Arm compiler for Dreamcast with newlib and C++"
+	echo "		Only affects the -dc option"
 	echo "SENDTOWHERE	For setting where to send output (use absolute path names)"
 	echo "ERRORTOWHERE	Same as above but for errors"
 	echo "TESTING		Setting it equal to 1 to install compiler to ./testcompiler"
@@ -981,6 +1145,9 @@ Examples()
 	echo "Tell where kos is located and install the Dreamcast compiler"
 	echo "KOSLOCATION=\`pwd\`/../kos $0 -dc"
 	echo
+	echo "Build the arm compiler with newlib and C++"
+	echo "TWOPASS=1 ./$0 -dc"
+	echo
 	echo "Send output from script to a log file and send any errors to another"
 	echo "SENDTOWHERE=\`pwd\`/output.log ERRORTOWHERE=\`pwd\`/error.log $0 -s -all"
 	echo "Same as above (remember there's more than one way to do things)"
@@ -993,6 +1160,9 @@ Examples()
 	echo
 	echo "Make Dreamcast compiler with cross-compiler and put it test directory"
 	echo "TESTING=1 HOSTPRE=sh4-linux-uclibc $0 -dc"
+	echo
+	echo "These should give you a pretty good idea on what you can do."
+	echo "There are things I probably haven't even really thought about doing too."
 }
 
 ###############################################################################
@@ -1018,6 +1188,10 @@ ParseArgs()
 			;;
 		"-all")
 			All
+			return 0
+			;;
+		"-allc")
+			CleanningAll
 			return 0
 			;;
 		"-cb")
@@ -1060,6 +1234,10 @@ ParseArgs()
 			BuildDreamcast
 			return 0
 			;;
+		"-dcc")
+			BuildCleaningDreamcast
+			return 0
+			;;
 		"-k")
 			BuildKos
 			return 0
@@ -1073,54 +1251,30 @@ ParseArgs()
 			Examples
 			exit
 			;;
+		"-i")
+			rm $TARG-*/.*installed*
+			return 0
+			;;
 		"dreamcast")
 			SetOptions Dreamcast
-			Setup
 			return 0
 			;;
 		"genesis")
 			SetOptions Genesis
-			Setup
 			return 0
 			;;
 		"gamecube")
 			SetOptions Gamecube
-			Setup
 			return 0
 			;;
 		"ix86")
 			SetOptions ix86
-			Setup
 			return 0
 			;;
 	esac
 
 	# Command wasn't in above so return 1	
 	return 1
-}
-
-###############################################################################
-# Setup the target install prefix and paths
-###############################################################################
-Setup()
-{
-	# Which target to use
-	TARG="$TARG1"
-	# The target for configure
-	TARGET="--target=$TARG"
-	# The prefix to install for configure
-	PREFIX="--prefix=$INSTALL"
-
-	BINBUILD="$TARG-binbuildelf"
-	GCCBUILD="$TARG-gccbuildelf"
-	NEWLIBBUILD="$TARG-newlibbuildelf"
-	
-	# If the install directory doesn't exist make it
-	if [ ! -d $INSTALL ]; then
-		mkdir $INSTALL
-	fi
-
-	export PATH=$INSTALL/bin:$PATH
 }
 
 ###############################################################################
@@ -1131,8 +1285,6 @@ main()
 	# Set up some things the user wont ever need to
 	# Default to $SYSTEM options
 	SetOptions $SYSTEM
-	# Setup directories
-	Setup 
 	
 	# Check if there aren't any arguments
 	if [ $# -le 0 ]; then

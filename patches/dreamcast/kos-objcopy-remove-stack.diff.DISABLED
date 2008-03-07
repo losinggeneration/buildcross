@@ -1,0 +1,22 @@
+diff -ruN kos.org/utils/gnu_wrappers/kos-objcopy kos/utils/gnu_wrappers/kos-objcopy
+--- kos.org/utils/gnu_wrappers/kos-objcopy	2006-09-25 11:18:09.000000000 -0500
++++ kos/utils/gnu_wrappers/kos-objcopy	2006-09-25 11:09:45.000000000 -0500
+@@ -1,3 +1,17 @@
+ #!/bin/sh
+ 
+-exec ${KOS_OBJCOPY} "$@"
++OBJOUT=0
++
++for i in $@; do
++	if [ $i == "-O" ];then
++		OBJOUT=1
++	fi
++	if [ $i == binary -a $OBJOUT == 1 ];then
++		RMSTACK="-R.stack"
++	fi
++	if [ $i == "-Obinary" ];the
++		RMSTACK="-R.stack"
++	fi
++done
++
++${KOS_OBJCOPY} $RMSTACK $@

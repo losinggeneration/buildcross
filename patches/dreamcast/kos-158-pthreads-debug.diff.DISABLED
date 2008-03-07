@@ -1,0 +1,28 @@
+Index: kos-1.3.0/kos/kernel/libc/pthreads/pthread_mutex.c
+===================================================================
+--- kos-1.3.0/kos/kernel/libc/pthreads/pthread_mutex.c	(revision 158)
++++ kos-1.3.0/kos/kernel/libc/pthreads/pthread_mutex.c	(working copy)
+@@ -1,6 +1,7 @@
+ #include <pthread.h>
+ #include <errno.h>
+ #include <assert.h>
++#include <stdio.h>
+ 
+ // XXX Recursive mutexes are not supported ... this could cause deadlocks
+ // in code expecting it. Where do you set that!?
+@@ -60,6 +61,7 @@
+ 	CHK_AND_CREATE;
+ 
+ 	mutex_lock(*mutex);
++	printf("locked %08x\n", mutex);
+ 	return 0;
+ }
+ 
+@@ -84,6 +86,7 @@
+ 	CHK_AND_CREATE;
+ 
+ 	mutex_unlock(*mutex);
++	printf("unlocked %08x\n", mutex);
+ 	return 0;
+ }
+ 

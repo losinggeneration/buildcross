@@ -1,0 +1,1 @@
+All patches were borrowed from buildscripts-20050915.tar.bz2 from the devkitpro project. The gcc-3.4.6.diff was back ported by myself. It may not be completely correct.

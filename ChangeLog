@@ -96,7 +96,7 @@ Version 1.5:
 	-Targets are built in target directories rather than in the base
 	 directory. Also, gcc, binutils, etc are extracted to and patched in
 	 the target directory allowing building separate chains without
-	 deleting gcc, binutils, etc between builds. 
+	 deleting gcc, binutils, etc between builds.
 	-Patch and Result now log if told to.
 	-Fixed SENDTO/ERRORTO output if file didn't exist.
 	-echo is no longer used, logging functions (which are the only ones
@@ -134,9 +134,10 @@ Version 1.6:
 	 fixed again. It shouldn't be too hard to fix, I'm just not going to
 	 do it for this release. It fails on second pass of building Gcc at
 	 the posix threads code.
-	-Genesis was broken but now fixed. GAS in binutils 2.16.1 and 2.17 
+	-Genesis was broken but now fixed. GAS in binutils 2.16.1 and 2.17
 	 for m86k-coff seem to be disabled and so 2.15 is used and patched to
-	 work with gcc 4.x compilers. 
+	 work with gcc 4.x compilers.
+
 Version 1.7:
 	-Bumped Newlib version to 1.15.0 for Dreamcast compilers.
 	-Created Glibc Linux cross compilers.
@@ -147,16 +148,16 @@ Version 1.7:
 	 compilers.
 	-Combined ConfigureBaseGcc and ConfigureFinalGcc.
 	-Combined BuildBaseGcc and BuildFinalGcc.
-	-Calling individual commands such as (-cb, -bb, -cig, etc) will clean 
+	-Calling individual commands such as (-cb, -bb, -cig, etc) will clean
 	 the directory build directory before running the command. Running -all
 	 and such commands will still not run commands that have already been
-	 run. 
+	 run.
 	-Linux compilers can choose to use different uClibc and kernel header
 	 versions/types. (for instance, kernel headers from the 2.6.20 branch
 	 instead of the libc-2.6.12 sterilized headers)
 	-Small changes to how success/fails are outputted [OK] and [FAIL].
 	-Linux compilers use sys-root now.
-	-Re-enabled Gamecube compiler with fixes (THREADS=yes) 
+	-Re-enabled Gamecube compiler with fixes (THREADS=yes)
 	-Fixed a bug where -c would nuke the current directory on non-uClibc
 	 compilers.
 	-Fixed a small logic error and syntax error when checking for KOS and
@@ -165,7 +166,7 @@ Version 1.7:
 	-Did some formatting changes to the examples output.
 	-Simplified the process of generating environ.sh for KOS. Now cut is
 	 required to setup KOS. (Not a problem in most every UNIX like
-	 environment.) 
+	 environment.)
 	-Updated the KOS/KOS Ports location for the update Sourceforge made to
 	 svn locations.
 	-Added archlinuxppc to targets. Useful as an example of how to create
@@ -177,7 +178,7 @@ Version 1.7:
 	 compiler.
 	-Changed behavior of HOSTPRE so the compiler prefix is the same and
 	 also it doesn't include the PATH in case of program name conflicts.
-	-Took paranoid approach to executing commands. 
+	-Took paranoid approach to executing commands.
 	-Fix to installing Glibc headers, include/bits may not be created by
 	 default, so we make sure it's there.
 	-Added --enable-install-libbfd to Dreamcast binutils options. It
@@ -187,3 +188,9 @@ Version 1.7:
 	-Updated NOTES to include some info about building dcload.
 	-Changed !/bin/bash to just !/bin/sh.
 	-Better checks for build dependencies.
+
+Version 1.7.1:
+	-Changed Dreamcast.cfg backt to know good values.
+
+Version 1.8:
+	-Killed dead spaces off of Changelog.

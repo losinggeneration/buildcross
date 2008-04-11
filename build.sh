@@ -159,44 +159,48 @@ BuildNewlib()
 
 		# SHELF is defined in Dreamcast.cfg
 		if [ "$SHELF" ]; then
-			if [ $THREADS == "posix" -o $THREADS == "yes" ]; then
-				# Make sure KOS is downloaded before trying to copy files from
-				# it
-				QuietExec "mkdir -p $KOSLOCATION"
-				Download kos
-				###############################################################
-				# This was taken from Jim Ursetto's Makefile script to set up
-				# some KOS stuff
-				###############################################################
-				# Only needed for the Dreamcast/kos
-				###############################################################
-				# I couldn't find any kind of license for this so below may
-				# not be covered under the license at the beginning of this
-				# file.
-				###############################################################
-				LogTitle "Symlinking KOS libraries..."
-				if [ $(echo $GCCVER | cut -b5) -le 3 ]; then
-					# KOS pthread.h is modified
-					ExecuteCmd "cp $KOSLOCATION/include/pthread.h $INSTALL/$TARG/include"
-					# to define _POSIX_THREADS
-					ExecuteCmd "cp $KOSLOCATION/include/sys/_pthread.h $INSTALL/$TARG/include/sys"
-					# pthreads to kthreads mapping
-					ExecuteCmd "cp $KOSLOCATION/include/sys/sched.h $INSTALL/$TARG/include/sys"
-				else
-					if [ -e "$PATCHDIR/$NEWLIBVER-_pthread.h" ]; then
-						ExecuteCmd "cp $PATCHDIR/$NEWLIBVER-_pthread.h $INSTALL/$TARG/include/sys/_pthread.h"
-					fi
-					if [ -e "$PATCHDIR/$NEWLIBVER-_types.h" ]; then
-						ExecuteCmd "cp $PATCHDIR/$NEWLIBVER-_types.h $INSTALL/$TARG/include/sys/_types.h"
-					fi
-				fi
-				# so KOS includes are available as kos/file.h
-				ExecuteCmd "ln -nsf $KOSLOCATION/include/kos $INSTALL/$TARG/include"
-				# kos/thread.h requires arch/arch.h
-				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/arch $INSTALL/$TARG/include"
-				# arch/arch.h requires dc/video.h
-				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/dc $INSTALL/$TARG/include"
-			fi
+#			if [ $THREADS == "posix" -o $THREADS == "yes" ]; then
+#				# Make sure KOS is downloaded before trying to copy files from
+#				# it
+#				QuietExec "mkdir -p $KOSLOCATION"
+#				Download kos
+#				###############################################################
+#				# This was taken from Jim Ursetto's Makefile script to set up
+#				# some KOS stuff
+#				###############################################################
+#				# Only needed for the Dreamcast/kos
+#				###############################################################
+#				# I couldn't find any kind of license for this so below may
+#				# not be covered under the license at the beginning of this
+#				# file.
+#				###############################################################
+#				LogTitle "Symlinking KOS libraries..."
+#				if [ $(echo $GCCVER | cut -b5) -le 3 ]; then
+#					# KOS pthread.h is modified
+#					ExecuteCmd "cp $KOSLOCATION/include/pthread.h $INSTALL/$TARG/include"
+#					# to define _POSIX_THREADS
+#					ExecuteCmd "cp $KOSLOCATION/include/sys/_pthread.h $INSTALL/$TARG/include/sys"
+#					# pthreads to kthreads mapping
+#					ExecuteCmd "cp $KOSLOCATION/include/sys/sched.h $INSTALL/$TARG/include/sys"
+#				else
+#					if [ -e "$PATCHDIR/$NEWLIBVER-_pthread.h" ]; then
+#						ExecuteCmd "cp $PATCHDIR/$NEWLIBVER-_pthread.h $INSTALL/$TARG/include/sys/_pthread.h"
+#					fi
+#					if [ -e "$PATCHDIR/$NEWLIBVER-_types.h" ]; then
+#						ExecuteCmd "cp $PATCHDIR/$NEWLIBVER-_types.h $INSTALL/$TARG/include/sys/_types.h"
+#					fi
+#				fi
+#				# so KOS includes are available as kos/file.h
+#				ExecuteCmd "ln -nsf $KOSLOCATION/include/kos $INSTALL/$TARG/include"
+#				# kos/thread.h requires arch/arch.h
+#				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/arch $INSTALL/$TARG/include"
+#				# arch/arch.h requires dc/video.h
+#				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/dc $INSTALL/$TARG/include"
+#			fi
+			ConfigureKos
+			ExecuteCmd "ln -nsf $INSTALL/include/sys/_pthread.h $INSTALL/$TARG/include/sys/_pthread.h"
+			ExecuteCmd "rm $INSTALL/$TARG/include/machine/_types.h"
+			ExecuteCmd "ln -nsf $INSTALL/include/machine/_types.h $INSTALL/$TARG/include/machine/_types.h"
 		fi
 
 		QuietExec "touch .installed"
@@ -390,13 +394,10 @@ BuildGlibc()
 	cd $BASEDIR
 }
 
-###############################################################################
-# Build Kos for Dreamcast
-###############################################################################
-BuildKos()
+ConfigureKos()
 {
-	LogTitle "Building Kos"
-	Download kos
+	LogTitle "Configuring Kos"
+#	Download kos
 
 	QuietExec "cd $KOSLOCATION"
 
@@ -405,15 +406,19 @@ BuildKos()
 	#######################################################################
 	QuietExec "cp doc/environ.sh.sample environ.sh"
 
-	# Change KOS_BASE to point to where our Kos is located
-	KOSBASELINE=$(grep -n "^export KOS_BASE\=" environ.sh | cut -f1 -d:)
-
-	# Then I replace the old line with the new one
-	sed -e "$KOSBASELINE c export KOS_BASE=\"$KOSLOCATION\"" -i environ.sh
-	# Instead of being overly paranoid, we'll just use one Result to make
-	# sure we got the environ.sh copied correctly.
-	Result "sed -e \"$KOSBASELINE c export KOS_BASE=\"$KOSLOCATION\"\" -i environ.sh"
-	LogOutput "Changed KOS_BASE with $KOSLOCATION"
+#	# Change KOS_BASE to point to where our Kos is located
+#	KOSBASELINE=$(grep -n "^export KOS_BASE\=" environ.sh | cut -f1 -d:)
+#
+#	# Then I replace the old line with the new one
+#	sed -e "$KOSBASELINE c export KOS_BASE=\"$KOSLOCATION\"" -i environ.sh
+#	# Instead of being overly paranoid, we'll just use one Result to make
+#	# sure we got the environ.sh copied correctly.
+#	Result "sed -e \"$KOSBASELINE c export KOS_BASE=\"$KOSLOCATION\"\" -i environ.sh"
+#	LogOutput "Changed KOS_BASE with $KOSLOCATION"
+	# KOS is installable so KOS_BASE is no more
+	KOSPATHLINE=$(grep -n "^export KOS_PATH\=" environ.sh | cut -f1 -d:)
+	sed -e "$KOSPATHLINE c export KOS_PATH=\"$INSTALL\"" -i environ.sh
+	LogOutput "Change KOS_PATH with $INSTALL"
 
 	if [ "$TARG" == "$SHELF" -o "$TARG" == "$ARMELF" ]; then
 		# Same as above for DC_ARM_BASE, but we use where the compiler is
@@ -459,11 +464,12 @@ BuildKos()
 	LogOutput "Changed KOS_CC_PREFIX to $THISTARG"
 
 	# Change the PATH expansion line
-	KOSPATHLINE=$(grep -n "^export PATH=" environ.sh | cut -f1 -d:)
+#	PATHLINE=$(grep -n "^export PATH=" environ.sh | cut -f1 -d:)
+#	Debug "$PATHLINE"
 	# The sample uses ${KOS_CC_BASE}/bin:/usr/local/dc/bin which means on a standard
 	# install it's going to be the same
-	sed -e "$KOSPATHLINE c export PATH=\"\${PATH}:\${KOS_CC_BASE}/bin\"" -i environ.sh
-	LogOutput "Changed PATH to \${PATH}:\${KOS_CC_BASE}/bin\""
+#	sed -e "$PATHLINE c export PATH=\"\${PATH}:\${KOS_CC_BASE}/bin\"" -i environ.sh
+#	LogOutput "Changed PATH to \${PATH}:\${KOS_CC_BASE}/bin\""
 
 	# Change the MAKE variable to match the one here
 	KOSMAKELINE=$(grep -n "^export KOS_MAKE=" environ.sh | cut -f1 -d:)
@@ -471,8 +477,30 @@ BuildKos()
 	LogOutput "Changed KOS_MAKE to $MAKE"
 	#######################################################################
 
-	# Set environ.sh variables to use
-	source environ.sh
+	ExecuteCmd "utils/gnu_wrappers/kos-make install-tools"
+	ExecuteCmd "utils/gnu_wrappers/kos-make install-headers"
+
+	touch .configured-kos
+
+	cd $BASEDIR
+}
+
+###############################################################################
+# Build Kos for Dreamcast
+###############################################################################
+BuildKos()
+{
+	if ! CheckExists .configured-kos; then
+		ConfigureKos
+	fi
+
+	LogTitle "Building Kos"
+#	Download kos
+
+	QuietExec "cd $KOSLOCATION"
+
+#	# Set environ.sh variables to use
+#	source environ.sh
 
 	Patch kos $KOSPATCH
 	QuietExec "cd $KOSLOCATION"
@@ -485,6 +513,8 @@ BuildKos()
 	QuietExec "cd $KOSLOCATION/../kos-ports"
 	ExecuteCmd "$MAKE clean"
 	ExecuteCmd "$MAKE" "Building Kos ports"
+
+	cd $BASEDIR
 }
 
 ###############################################################################

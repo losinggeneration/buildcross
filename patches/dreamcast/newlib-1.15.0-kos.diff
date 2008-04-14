@@ -1,6 +1,6 @@
-diff -ruN newlib-1.12.0/config-ml.in newlib-1.12.0-kos/config-ml.in
---- newlib-1.12.0/config-ml.in	2004-01-04 16:42:16.000000000 -0800
-+++ newlib-1.12.0-kos/config-ml.in	2004-08-07 09:30:51.000000000 -0700
+diff -ruN newlib-1.15.0/config-ml.in newlib-1.15.0-kos/config-ml.in
+--- newlib-1.15.0/config-ml.in	2004-01-04 16:42:16.000000000 -0800
++++ newlib-1.15.0-kos/config-ml.in	2004-08-07 09:30:51.000000000 -0700
 @@ -196,19 +196,19 @@
  
  if [ "${ml_toplevel_p}" = yes ]; then
@@ -34,9 +34,9 @@ diff -ruN newlib-1.12.0/config-ml.in newlib-1.12.0-kos/config-ml.in
  
  # Target libraries are configured for the host they run on, so we check
  # $host here, not $target.
-diff -ruN newlib-1.12.0/newlib/configure.host newlib-1.12.0-kos/newlib/configure.host
---- newlib-1.12.0/newlib/configure.host	2004-02-02 08:59:51.000000000 -0800
-+++ newlib-1.12.0-kos/newlib/configure.host	2004-08-07 10:34:46.000000000 -0700
+diff -ruN newlib-1.15.0/newlib/configure.host newlib-1.15.0-kos/newlib/configure.host
+--- newlib-1.15.0/newlib/configure.host	2004-02-02 08:59:51.000000000 -0800
++++ newlib-1.15.0-kos/newlib/configure.host	2004-08-07 10:34:46.000000000 -0700
 @@ -178,6 +178,7 @@
  	;;
    sh | sh64)
@@ -45,9 +45,9 @@ diff -ruN newlib-1.12.0/newlib/configure.host newlib-1.12.0-kos/newlib/configure
  	;;
    sparc*)
  	machine_dir=sparc
-diff -ruN newlib-1.12.0/newlib/libc/sys/sh/ftruncate.c newlib-1.12.0-kos/newlib/libc/sys/sh/ftruncate.c
---- newlib-1.12.0/newlib/libc/sys/sh/ftruncate.c	2003-07-10 08:31:30.000000000 -0700
-+++ newlib-1.12.0-kos/newlib/libc/sys/sh/ftruncate.c	2004-08-07 09:40:01.000000000 -0700
+diff -ruN newlib-1.15.0/newlib/libc/sys/sh/ftruncate.c newlib-1.15.0-kos/newlib/libc/sys/sh/ftruncate.c
+--- newlib-1.15.0/newlib/libc/sys/sh/ftruncate.c	2003-07-10 08:31:30.000000000 -0700
++++ newlib-1.15.0-kos/newlib/libc/sys/sh/ftruncate.c	2004-08-07 09:40:01.000000000 -0700
 @@ -2,8 +2,8 @@
  #include <sys/types.h>
  #include "sys/syscall.h"
@@ -59,9 +59,9 @@ diff -ruN newlib-1.12.0/newlib/libc/sys/sh/ftruncate.c newlib-1.12.0-kos/newlib/
    return __trap34 (SYS_ftruncate, file, length, 0);
 -}
 +} */
-diff -ruN newlib-1.12.0/newlib/libc/sys/sh/sys/_types.h newlib-1.12.0-kos/newlib/libc/sys/sh/sys/_types.h
---- newlib-1.12.0/newlib/libc/sys/sh/sys/_types.h	1969-12-31 16:00:00.000000000 -0800
-+++ newlib-1.12.0-kos/newlib/libc/sys/sh/sys/_types.h	2004-08-07 09:22:27.000000000 -0700
+diff -ruN newlib-1.15.0/newlib/libc/sys/sh/sys/_types.h newlib-1.15.0-kos/newlib/libc/sys/sh/sys/_types.h
+--- newlib-1.15.0/newlib/libc/sys/sh/sys/_types.h	1969-12-31 16:00:00.000000000 -0800
++++ newlib-1.15.0-kos/newlib/libc/sys/sh/sys/_types.h	2004-08-07 09:22:27.000000000 -0700
 @@ -0,0 +1,42 @@
 +/* ANSI C namespace clean utility typedefs */
 +
@@ -105,9 +105,9 @@ diff -ruN newlib-1.12.0/newlib/libc/sys/sh/sys/_types.h newlib-1.12.0-kos/newlib
 +typedef void *_iconv_t;
 +
 +#endif	/* _SYS__TYPES_H */
-diff -ruN newlib-1.12.0/newlib/libc/sys/sh/sys/lock.h newlib-1.12.0-kos/newlib/libc/sys/sh/sys/lock.h
---- newlib-1.12.0/newlib/libc/sys/sh/sys/lock.h	1969-12-31 16:00:00.000000000 -0800
-+++ newlib-1.12.0-kos/newlib/libc/sys/sh/sys/lock.h	2004-08-07 10:41:28.000000000 -0700
+diff -ruN newlib-1.15.0/newlib/libc/sys/sh/sys/lock.h newlib-1.15.0-kos/newlib/libc/sys/sh/sys/lock.h
+--- newlib-1.15.0/newlib/libc/sys/sh/sys/lock.h	1969-12-31 16:00:00.000000000 -0800
++++ newlib-1.15.0-kos/newlib/libc/sys/sh/sys/lock.h	2004-08-07 10:41:28.000000000 -0700
 @@ -0,0 +1,36 @@
 +#ifndef __SYS_LOCK_H__
 +#define __SYS_LOCK_H__
@@ -145,9 +145,9 @@ diff -ruN newlib-1.12.0/newlib/libc/sys/sh/sys/lock.h newlib-1.12.0-kos/newlib/l
 +void __newlib_lock_release_recursive(_LOCK_RECURSIVE_T *);
 +
 +#endif /* __SYS_LOCK_H__ */
-diff -ruN newlib-1.12.0/newlib/libc/sys/sh/syscalls.c newlib-1.12.0-kos/newlib/libc/sys/sh/syscalls.c
---- newlib-1.12.0/newlib/libc/sys/sh/syscalls.c	2001-02-01 13:25:56.000000000 -0800
-+++ newlib-1.12.0-kos/newlib/libc/sys/sh/syscalls.c	2004-08-07 10:24:07.000000000 -0700
+diff -ruN newlib-1.15.0/newlib/libc/sys/sh/syscalls.c newlib-1.15.0-kos/newlib/libc/sys/sh/syscalls.c
+--- newlib-1.15.0/newlib/libc/sys/sh/syscalls.c	2001-02-01 13:25:56.000000000 -0800
++++ newlib-1.15.0-kos/newlib/libc/sys/sh/syscalls.c	2004-08-07 10:24:07.000000000 -0700
 @@ -1,221 +1,2 @@
 -#include <_ansi.h>
 -#include <sys/types.h>
@@ -372,9 +372,9 @@ diff -ruN newlib-1.12.0/newlib/libc/sys/sh/syscalls.c newlib-1.12.0-kos/newlib/l
 -}
 +// This is put in here to cause link errors if a proper newlib isn't present.
 +int __newlib_kos_patch = 1;
-diff -ruN newlib-1.12.0/newlib/libc/sys/sh/trap.S newlib-1.12.0-kos/newlib/libc/sys/sh/trap.S
---- newlib-1.12.0/newlib/libc/sys/sh/trap.S	2002-02-07 23:11:13.000000000 -0800
-+++ newlib-1.12.0-kos/newlib/libc/sys/sh/trap.S	2004-08-07 09:39:14.000000000 -0700
+diff -ruN newlib-1.15.0/newlib/libc/sys/sh/trap.S newlib-1.15.0-kos/newlib/libc/sys/sh/trap.S
+--- newlib-1.15.0/newlib/libc/sys/sh/trap.S	2002-02-07 23:11:13.000000000 -0800
++++ newlib-1.15.0-kos/newlib/libc/sys/sh/trap.S	2004-08-07 09:39:14.000000000 -0700
 @@ -1,43 +0,0 @@
 -#if __SH5__
 -	.mode	SHmedia
@@ -419,9 +419,9 @@ diff -ruN newlib-1.12.0/newlib/libc/sys/sh/trap.S newlib-1.12.0-kos/newlib/libc/
 -perrno:
 -	.long	_errno
 -#endif /* ! __SH5__ */
-diff -ruN newlib-1.12.0/newlib/libc/sys/sh/truncate.c newlib-1.12.0-kos/newlib/libc/sys/sh/truncate.c
---- newlib-1.12.0/newlib/libc/sys/sh/truncate.c	2003-07-10 08:31:30.000000000 -0700
-+++ newlib-1.12.0-kos/newlib/libc/sys/sh/truncate.c	2004-08-07 09:39:55.000000000 -0700
+diff -ruN newlib-1.15.0/newlib/libc/sys/sh/truncate.c newlib-1.15.0-kos/newlib/libc/sys/sh/truncate.c
+--- newlib-1.15.0/newlib/libc/sys/sh/truncate.c	2003-07-10 08:31:30.000000000 -0700
++++ newlib-1.15.0-kos/newlib/libc/sys/sh/truncate.c	2004-08-07 09:39:55.000000000 -0700
 @@ -2,8 +2,8 @@
  #include <sys/types.h>
  #include "sys/syscall.h"
@@ -433,3 +433,72 @@ diff -ruN newlib-1.12.0/newlib/libc/sys/sh/truncate.c newlib-1.12.0-kos/newlib/l
    return __trap34 (SYS_truncate, path, length, 0);
 -}
 +} */
+diff -ruN newlib-1.15.0/newlib/libc/include/sys/types.h newlib-1.15.0-kos/newlib/libc/include/sys/types.h
+--- newlib-1.15.0/newlib/libc/include/sys/types.h       2006-09-13 15:09:27.000000000 -0700
++++ newlib-1.15.0-kos/newlib/libc/include/sys/types.h   2007-08-27 10:39:04.804359158 -0700
+@@ -280,7 +280,9 @@
+  *  2.5 Primitive System Data Types,  P1003.1c/D10, p. 19.
+  */
+ 
++#ifndef _arch_dreamcast
+ typedef __uint32_t pthread_t;            /* identify a thread */
++#endif
+ 
+ /* P1003.1c/D10, p. 118-119 */
+ #define PTHREAD_SCOPE_PROCESS 0
+@@ -296,6 +298,7 @@
+ #define PTHREAD_CREATE_DETACHED 0
+ #define PTHREAD_CREATE_JOINABLE  1
+ 
++#ifndef _arch_dreamcast
+ typedef struct {
+   int is_initialized;
+   void *stackaddr;
+@@ -312,6 +315,7 @@
+   int  detachstate;
+ 
+ } pthread_attr_t;
++#endif
+ 
+ #if defined(_POSIX_THREAD_PROCESS_SHARED)
+ /* NOTE: P1003.1c/D10, p. 81 defines following values for process_shared.  */
+@@ -332,6 +336,7 @@
+ #define PTHREAD_PRIO_PROTECT 2
+ #endif
+ 
++#ifndef _arch_dreamcast
+ typedef __uint32_t pthread_mutex_t;      /* identify a mutex */
+ 
+ typedef struct {
+@@ -345,9 +350,11 @@
+ #endif
+   int   recursive;
+ } pthread_mutexattr_t;
++#endif
+ 
+ /* Condition Variables */
+ 
++#ifndef _arch_dreamcast
+ typedef __uint32_t pthread_cond_t;       /* identify a condition variable */
+ 
+ typedef struct {
+@@ -356,15 +363,18 @@
+   int   process_shared;       /* allow this to be shared amongst processes */
+ #endif
+ } pthread_condattr_t;         /* a condition attribute object */
++#endif
+ 
+ /* Keys */
+ 
++#ifndef _arch_dreamcast
+ typedef __uint32_t pthread_key_t;        /* thread-specific data keys */
+ 
+ typedef struct {
+   int   is_initialized;  /* is this structure initialized? */
+   int   init_executed;   /* has the initialization routine been run? */
+ } pthread_once_t;       /* dynamic package initialization */
++#endif
+ #else
+ #if defined (__CYGWIN__)
+ #include <cygwin/types.h>
+

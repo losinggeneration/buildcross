@@ -89,6 +89,7 @@ ConfigureGcc()
 			OPTS=$GCCFOPTS
 		fi
 
+		Debug "../$GCCVER/configure $OPTS"
 		ExecuteCmd "../$GCCVER/configure $OPTS" "Configuring $1 Gcc"
 		QuietExec "touch .configure-$1"
 	else

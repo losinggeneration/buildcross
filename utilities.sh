@@ -142,8 +142,9 @@ CreateDir()
 # 1) Try to create directories if needed
 # 2) If untar returns true than patch it
 # Otherwise it does nothing
-# $1 is the source directory name
-# $2-$* is the patches (Gcc, Binutils, Newlib, Kos, Kos Ports)
+# $1 is the source name
+# $2 is the source version
+# $* is the patches (Gcc, Binutils, Newlib, Kos, Kos Ports)
 ###############################################################################
 UntarPatch()
 {
@@ -151,8 +152,8 @@ UntarPatch()
 
 	# check if the directory for the source exists
 	# and that we got to touch that it's untared
-	if [ ! -d $TARG/$1 -o ! -e $TARG/$1/.untared ]; then
-		Untar $1
+	if [ ! -d $TARG/$1-$2 -o ! -e $TARG/$1-$2/.untared-$2 ]; then
+		Untar $1 $2
 	fi
 
 	# We send all parameters because the first is $1 and the rest
@@ -161,29 +162,53 @@ UntarPatch()
 }
 
 ###############################################################################
+# 1) Try to create directories if needed
+# 2) If untar returns true than patch it
+# Otherwise it does nothing
+# $1 is the source version
+# $2 is the language
+###############################################################################
+GccUntar()
+{
+	CreateDir
+
+	# check if the directory for the source exists
+	# and that we got to touch that it's untared
+	if [ ! -d $TARG/$GCC -o ! -e $TARG/$GCC/.untared-$2-$1 ]; then
+		Untar gcc $GCCVER $2
+	fi
+}
+
+###############################################################################
 # Untar the source if needed
 ###############################################################################
 Untar()
 {
+	if [ "$1" == "gcc" ]; then
+		lver="$3-$2"
+	else
+		lver="$2"
+	fi
+
 	# Make sure to it's downloaded
-	Download $1
+	Download $1 $lver
 
 	# Now check if the tar.bz2 file exists
-	if ! CheckExists $1.tar.bz2; then
+	if ! CheckExists $1-$lver.tar.bz2; then
 		# if it doesn't try for tar.gz
-		if CheckExists $1.tar.gz; then
+		if CheckExists $1-$lver.tar.gz; then
 			# We have the tar.gz hooray
-			ExecuteCmd "tar xfz $1.tar.gz -C $TARG" "Untaring $1.tar.gz"
+			ExecuteCmd "tar xfz $1-$lver.tar.gz -C $TARG" "Untaring $1-$lver.tar.gz"
 		fi
-	elif CheckExists $1.tar.bz2; then
+	elif CheckExists $1-$lver.tar.bz2; then
 		# Well we have the tar.bz2 good job
-		ExecuteCmd "tar xfj $1.tar.bz2 -C $TARG" "Untaring $1.tar.bz2"
+		ExecuteCmd "tar xfj $1-$lver.tar.bz2 -C $TARG" "Untaring $1-$lver.tar.bz2"
 	else
-		LogFatal "Cannot untar $1.tar.bz2 or $1.tar.gz. Make sure .$1-downloaded doesn't exist or the file might be corrupt. If you do get this message tell me how, because it seems like it shouldn't ever come up."
+		LogFatal "Cannot untar $1-$lver.tar.bz2 or $1-$lver.tar.gz. Make sure .$1-$lver-downloaded doesn't exist or the file might be corrupt. If you do get this message tell me how, because it seems like it shouldn't ever come up."
 	fi
 
 	# A quick way to tell if we need to untar or not
-	QuietExec "touch $TARG/$1/.untared"
+	QuietExec "touch $TARG/$1-$2/.untared-$lver"
 }
 
 ###############################################################################
@@ -192,42 +217,42 @@ Untar()
 Download()
 {
 	case $1 in
-		"$BINVER")
-			if ! CheckExists .$BINVER-downloaded || ! CheckExists $BINVER.tar.bz2 ; then
-				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/binutils/$BINVER.tar.bz2"
-				QuietExec "touch .$BINVER-downloaded"
+		"binutils")
+			if ! CheckExists .$BINUTILS-downloaded || ! CheckExists $BINUTILS.tar.bz2 ; then
+				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/binutils/$BINUTILS.tar.bz2"
+				QuietExec "touch .$BINUTILS-downloaded"
 			fi
 			;;
-		"$GCCVER")
-			if ! CheckExists .$GCCVER-downloaded || ! CheckExists $GCCVER.tar.bz2; then
-				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/gcc/$GCCVER/$GCCVER.tar.bz2"
-				QuietExec "touch .$GCCVER-downloaded"
+		"gcc")
+			if ! CheckExists .$1-$2-downloaded || ! CheckExists $1-$2.tar.bz2; then
+				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/gcc/$GCC/$1-$2.tar.bz2"
+				QuietExec "touch .$1-$2-downloaded"
 			fi
 			;;
-		"$NEWLIBVER")
-			if ! CheckExists .$NEWLIBVER-downloaded || ! CheckExists $NEWLIBVER.tar.gz; then
-				ExecuteCmd "wget -c ftp://sources.redhat.com/pub/newlib/$NEWLIBVER.tar.gz"
-				QuietExec "touch .$NEWLIBVER-downloaded"
+		"newlib")
+			if ! CheckExists .$NEWLIB-downloaded || ! CheckExists $NEWLIB.tar.gz; then
+				ExecuteCmd "wget -c ftp://sources.redhat.com/pub/newlib/$NEWLIB.tar.gz"
+				QuietExec "touch .$NEWLIB-downloaded"
 			fi
 			;;
-		"$UCLIBCVER")
-			if ! CheckExists .$UCLIBCVER-downloaded || ! CheckExists $UCLIBCVER.tar.bz2; then
-				if [ $(echo $UCLIBCVER | grep snapshot) ]; then
-					ExecuteCmd "wget -c http://uclibc.org/downloads/snapshots/$UCLIBCVER.tar.bz2"
-				elif [ $(echo $UCLIBCVER | grep "\." ) ]; then
-					ExecuteCmd "wget -c http://uclibc.org/downloads/$UCLIBCVER.tar.bz2"
+		"uClibc")
+			if ! CheckExists .$UCLIBC-downloaded || ! CheckExists $UCLIBC.tar.bz2; then
+				if [ $(echo $UCLIBC | grep snapshot) ]; then
+					ExecuteCmd "wget -c http://uclibc.org/downloads/snapshots/$UCLIBC.tar.bz2"
+				elif [ $(echo $UCLIBC | grep "\." ) ]; then
+					ExecuteCmd "wget -c http://uclibc.org/downloads/$UCLIBC.tar.bz2"
 				else
 					QuietExec "cd $TARG"
 					ExecuteCmd "svn co svn://uclibc.org/trunk/uClibc"
 					QuietExec "cd .."
 				fi
-				QuietExec "touch .$UCLIBCVER-downloaded"
+				QuietExec "touch .$UCLIBC-downloaded"
 			fi
 			;;
-		"$GLIBCVER")
-			if ! CheckExists .$GLIBCVER-downloaded || ! CheckExists $GLIBCVER.tar.bz2; then
-				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/glibc/$GLIBCVER.tar.bz2"
-				QuietExec "touch .$GLIBCVER-downloaded"
+		"glibc")
+			if ! CheckExists .$GLIBC-downloaded || ! CheckExists $GLIBC.tar.bz2; then
+				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/glibc/$GLIBC.tar.bz2"
+				QuietExec "touch .$GLIBC-downloaded"
 			fi
 			;;
 		"$KERNELVER")
@@ -271,10 +296,15 @@ Patch()
 	elif [ $1 == "kos-ports" ]; then
 		LOC=$KOSLOCATION/../kos-ports
 	else
-		LOC=$BASEDIR/$TARG/$1
+		LOC=$BASEDIR/$TARG/$1-$2
 	fi
-	# We need to get past the name/version so shift the params one
-	shift 1
+
+	# We need to get past the name/version so shift the params two or three
+	if [ "$1" == "gcc" ]; then
+		shift 3
+	else
+		shift 2
+	fi
 
 	if ! CheckExists $LOC/.patched; then
 		QuietExec "cd $LOC"

@@ -194,3 +194,5 @@ Version 1.7.1:
 
 Version 1.8:
 	-Killed dead spaces off of Changelog.
+	-Gcc downloads should now overall be smaller in most cases since it's  now
+	 downloaded as gcc-core, gcc-g++, gcc-java, etc.

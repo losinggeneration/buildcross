@@ -13,7 +13,7 @@ ConfigureBin()
 {
 	LogTitle "Configuring Binutils"
 	# Try to Untar and Patch Binutils if needed
-	UntarPatch $BINVER $BINPATCH
+	UntarPatch binutils $BINVER $BINPATCH
 
 	# Check if we've already configured. If not, configure
 	if ! CheckExists $BINBUILD/.configure; then
@@ -22,7 +22,7 @@ ConfigureBin()
 		# Go to the build directory
 		QuietExec "cd $BASEDIR/$BINBUILD"
 
-		ExecuteCmd "../$BINVER/configure $BINOPTS" "Configuring Binutils"
+		ExecuteCmd "../$BINUTILS/configure $BINOPTS" "Configuring Binutils"
 		QuietExec "touch .configure"
 	else
 		LogTitle "Binutils Already configured"
@@ -76,7 +76,20 @@ BuildBin()
 ConfigureGcc()
 {
 	LogTitle "Configuring $1 Gcc"
-	UntarPatch $GCCVER $GCCPATCH
+	for langs in $(echo $LANGUAGES | sed "s/,/ /g"); do
+		case $langs in
+			"c")
+				langs="core" ;;
+			"fortran")
+				langs="g77" ;;
+			"c++")
+				langs="g++" ;;
+		esac
+
+		GccUntar $GCCVER $langs
+	done
+
+	Patch gcc $GCCVER $langs $GCCPATCH
 
 	if ! CheckExists $GCCBUILD/.configure-$1; then
 		# This will remove all files, but leave hidden ones
@@ -89,8 +102,7 @@ ConfigureGcc()
 			OPTS=$GCCFOPTS
 		fi
 
-		Debug "../$GCCVER/configure $OPTS"
-		ExecuteCmd "../$GCCVER/configure $OPTS" "Configuring $1 Gcc"
+		ExecuteCmd "../$GCC/configure $OPTS" "Configuring $1 Gcc"
 		QuietExec "touch .configure-$1"
 	else
 		LogTitle "Gcc $1 already configured"
@@ -131,13 +143,13 @@ BuildGcc()
 ConfigureNewlib()
 {
 	LogTitle "Configuring Newlib"
-	UntarPatch $NEWLIBVER $NEWLIBPATCH
+	UntarPatch newlib $NEWLIBVER $NEWLIBPATCH
 
 	if ! CheckExists $NEWLIBBUILD/.configure; then
 		Remove $NEWLIBBUILD
 		QuietExec "cd $BASEDIR/$NEWLIBBUILD"
 
-		ExecuteCmd "../$NEWLIBVER/configure $NEWLIBOPTS" "Configuring Newlib"
+		ExecuteCmd "../$NEWLIB/configure $NEWLIBOPTS" "Configuring Newlib"
 		QuietExec "touch .configure"
 	else
 		LogTitle "Newlib already configured"
@@ -176,7 +188,7 @@ BuildNewlib()
 				# file.
 				###############################################################
 				LogTitle "Symlinking KOS libraries..."
-				if [ $(echo $GCCVER | cut -b5) -le 3 ]; then
+				if [ $(echo $GCC | cut -b5) -le 3 ]; then
 					# KOS pthread.h is modified
 					ExecuteCmd "cp $KOSLOCATION/include/pthread.h $INSTALL/$TARG/include"
 					# to define _POSIX_THREADS
@@ -184,11 +196,11 @@ BuildNewlib()
 					# pthreads to kthreads mapping
 					ExecuteCmd "cp $KOSLOCATION/include/sys/sched.h $INSTALL/$TARG/include/sys"
 				else
-					if [ -e "$PATCHDIR/$NEWLIBVER-_pthread.h" ]; then
-						ExecuteCmd "cp $PATCHDIR/$NEWLIBVER-_pthread.h $INSTALL/$TARG/include/sys/_pthread.h"
+					if [ -e "$PATCHDIR/$NEWLIB-_pthread.h" ]; then
+						ExecuteCmd "cp $PATCHDIR/$NEWLIB-_pthread.h $INSTALL/$TARG/include/sys/_pthread.h"
 					fi
-					if [ -e "$PATCHDIR/$NEWLIBVER-_types.h" ]; then
-						ExecuteCmd "cp $PATCHDIR/$NEWLIBVER-_types.h $INSTALL/$TARG/include/sys/_types.h"
+					if [ -e "$PATCHDIR/$NEWLIB-_types.h" ]; then
+						ExecuteCmd "cp $PATCHDIR/$NEWLIB-_types.h $INSTALL/$TARG/include/sys/_types.h"
 					fi
 				fi
 				# so KOS includes are available as kos/file.h
@@ -214,7 +226,7 @@ BuildNewlib()
 ConfigureuClibc()
 {
 	LogTitle "Configuring uClibc"
-	UntarPatch $UCLIBCVER $UCLIBCPATCH
+	UntarPatch $UCLIBC $UCLIBCPATCH
 	UntarPatch $KERNELVER $KERNELPATCH
 
 	if ! CheckExists $UCLIBCDIR/.configure; then
@@ -253,7 +265,7 @@ ConfigureuClibc()
 
 		QuietExec "cd $BASEDIR/$UCLIBCDIR"
 
-		sed -e "s,KERNELSOURCEDIR,$SYSROOT/usr/include," -e "s,COMPILERPREFIX,$TARG-," -e "s,SHAREDLIBPREFIX,$UCLIBCHDIR," -e "s,RUNDEVPREFIX,$UCLIBCHDIR/usr," $PATCHDIR/$UCLIBCVER-config > .config
+		sed -e "s,KERNELSOURCEDIR,$SYSROOT/usr/include," -e "s,COMPILERPREFIX,$TARG-," -e "s,SHAREDLIBPREFIX,$UCLIBCHDIR," -e "s,RUNDEVPREFIX,$UCLIBCHDIR/usr," $PATCHDIR/$UCLIBC-config > .config
 
 		ExecuteCmd "make PREFIX=$UCLIBCHDIR DEVEL_PREFIX=/usr/ RUNTIME_PREFIX=$UCLIBCHDIR pregen install_dev"
 		QuietExec "touch .configure"
@@ -301,7 +313,7 @@ BuilduClibc()
 ConfigureGlibc()
 {
 	LogTitle "Configuring Glibc $1"
-	UntarPatch $GLIBCVER $GLIBCPATCH
+	UntarPatch $GLIBC $GLIBCPATCH
 	UntarPatch $KERNELVER $KERNELPATCH
 	QuietExec "mkdir -p $GLIBCDIR"
 
@@ -321,7 +333,7 @@ ConfigureGlibc()
 			# Now get the Glibc headers installed
 			QuietExec "cd $BASEDIR/$GLIBCDIR"
 
-			CC=gcc ExecuteCmd "../$GLIBCVER/configure $GLIBCHOPTS" "Configuring Glibc Headers" 
+			CC=gcc ExecuteCmd "../$GLIBC/configure $GLIBCHOPTS" "Configuring Glibc Headers" 
 			ExecuteCmd "$MAKE cross-compiling=yes install_root=$SYSROOT install-headers" "Installing Glibc Headers"
 
 			# Taken/adapted from CrossTool
@@ -330,7 +342,7 @@ ConfigureGlibc()
 			# See e.g. http://gcc.gnu.org/ml/gcc/2002-01/msg00900.html
 			QuietExec "mkdir -p $HEADERSDIR/gnu"
 			QuietExec "touch $HEADERSDIR/gnu/stubs.h"
-			QuietExec "cp ../$GLIBCVER/include/features.h $HEADERSDIR/features.h"
+			QuietExec "cp ../$GLIBC/include/features.h $HEADERSDIR/features.h"
 			# End stuff from CrossTool
 			# Hmm, bits/stdio_lim.h doesn't seem to be getting installed, simple fix, copy it to the correct location
 			# seems $HEADERSDIR/bits may not be created by default, so make sure it's there
@@ -351,7 +363,7 @@ ConfigureGlibc()
 			export libc_cv_forced_unwind libc_cv_c_cleanup
 
 			# Setting the pre-configure options adapted from CrossTool
-			BUILD_CC=gcc CC=$TARG-gcc AR=$TARG-ar RANLIB=$TARG-ranlib ExecuteCmd "../$GLIBCVER/configure $GLIBCFOPTS"
+			BUILD_CC=gcc CC=$TARG-gcc AR=$TARG-ar RANLIB=$TARG-ranlib ExecuteCmd "../$GLIBC/configure $GLIBCFOPTS"
 
 			Result "Configuring Glibc"
 		fi
@@ -513,19 +525,19 @@ CleaningAll()
 	ConfigureBin
 	BuildBin
 	CleaningRemove $BINBUILD
-	QuietExec "rm -fr $BASEDIR/$TARG/$BINVER"
+	QuietExec "rm -fr $BASEDIR/$TARG/$BINUTILS"
 	ConfigureGcc "Initial"
 	BuildGcc "Initial"
 	CleaningRemove $GCCBUILD
-	QuietExec "rm -fr $BASEDIR/$TARG/$GCCVER"
+	QuietExec "rm -fr $BASEDIR/$TARG/$GCC"
 	ConfigureNewlib
 	BuildNewlib
 	CleaningRemove $NEWLIBBUILD
-	QuietExec "rm -fr $BASEDIR/$TARG/$NEWLIBVER"
+	QuietExec "rm -fr $BASEDIR/$TARG/$NEWLIB"
 	ConfigureGcc "Final"
 	BuildGcc "Final"
 	CleaningRemove $GCCBUILD
-	QuietExec "rm -fr $BASEDIR/$TARG/$GCCVER"
+	QuietExec "rm -fr $BASEDIR/$TARG/$GCC"
 }
 
 ###############################################################################
@@ -572,11 +584,11 @@ BuildCleaningDreamcast()
 		ConfigureBin
 		BuildBin
 		CleaningRemove $BINBUILD
-		QuietExec "rm -fr $BASEDIR/$TARG/$BINVER"
+		QuietExec "rm -fr $BASEDIR/$TARG/$BINUTILS"
 		ConfigureGcc "Initial"
 		BuildGcc "Initial"
 		CleaningRemove $GCCBUILD
-		QuietExec "rm -fr $BASEDIR/$TARG/$GCCVER"
+		QuietExec "rm -fr $BASEDIR/$TARG/$GCC"
 	fi
 
 	BuildKos

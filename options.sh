@@ -141,20 +141,26 @@ SetOptions()
 		CLIBCHDIR=$TARG
 	fi
 
+	BINUTILS="binutils-$BINVER"
+	GCC="gcc-$GCCVER"
+	NEWLIB="newlib-$NEWLIBVER"
+	GLIBC="glibc-$GLIBCVER"
+	UCLIBC="uClibc-$UCLIBCVER"
+
 	# Binutils patches
-	BINPATCH=$(ls $PATCHDIR/$BINVER-* 2> /dev/null)
+	BINPATCH=$(ls $PATCHDIR/$BINUTILS-* 2> /dev/null)
 	# Gcc patches
-	GCCPATCH=$(ls $PATCHDIR/$GCCVER-* 2> /dev/null)
+	GCCPATCH=$(ls $PATCHDIR/$GCC-* 2> /dev/null)
 	# Newlib patches
-	NEWLIBPATCH=$(ls $PATCHDIR/$NEWLIBVER-* 2> /dev/null)
+	NEWLIBPATCH=$(ls $PATCHDIR/$NEWLIB-* 2> /dev/null)
 	# Kos patches
 	KOSPATCH=$(ls $PATCHDIR/kos-* 2> /dev/null)
 	# Kos-Ports patches
 	KOSPORTSPATCH=$(ls $PATCHDIR/kos-ports-* 2> /dev/null)
 	# Glibc patches
-	GLIBCPATCH=$(ls $PATCHDIR/$GLIBCVER-* 2> /dev/null)
+	GLIBCPATCH=$(ls $PATCHDIR/$GLIBC-* 2> /dev/null)
 	# uClibc patches
-	UCLIBCPATCH=$(ls $PATCHDIR/$UCLIBCVER-* 2> /dev/null)
+	UCLIBCPATCH=$(ls $PATCHDIR/$UCLIBC-* 2> /dev/null)
 
 	# Now we can setup everything else by the variables defined above
 	#################################################################

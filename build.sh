@@ -226,13 +226,13 @@ BuildNewlib()
 ConfigureuClibc()
 {
 	LogTitle "Configuring uClibc"
-	UntarPatch $UCLIBC $UCLIBCPATCH
-	UntarPatch $KERNELVER $KERNELPATCH
+	UntarPatch uClibc $UCLIBCVER $UCLIBCPATCH
+	UntarPatch $KERNELNAME $KERNELVER $KERNELPATCH
 
 	if ! CheckExists $UCLIBCDIR/.configure; then
-		QuietExec "cd $TARG/$KERNELVER"
+		QuietExec "cd $TARG/$KERNEL"
 
-		if [ $(echo $KERNELVER | grep libc) ]; then
+		if [ $(echo $KERNEL | grep libc) ]; then
 			# If it's the old headers, we we'll cd to include
 			QuietExec "cd include"
 
@@ -257,8 +257,6 @@ ConfigureuClibc()
 
 		QuietExec "cd $BASEDIR"
 
-		Debug $UCLIBCHDIR
-		Debug $SYSROOT
 		QuietExec "mkdir -p $UCLIBCHDIR/usr/include"
 		QuietExec "mkdir -p $UCLIBCHDIR/usr/lib"
 		QuietExec "mkdir -p $UCLIBCHDIR/lib"
@@ -313,16 +311,16 @@ BuilduClibc()
 ConfigureGlibc()
 {
 	LogTitle "Configuring Glibc $1"
-	UntarPatch $GLIBC $GLIBCPATCH
-	UntarPatch $KERNELVER $KERNELPATCH
+	UntarPatch glibc $GLIBCVER $GLIBCPATCH
+	UntarPatch $KERNELNAME $KERNELVER $KERNELPATCH
 	QuietExec "mkdir -p $GLIBCDIR"
 
 	if ! CheckExists $GLIBCDIR/.configure-$1; then
 		QuietExec "cd $BASEDIR/$GCLIBCDIR"
 		if [ "$1" == "Headers" ]; then
 			# Prepare the linux headers
-			QuietExec "cd $BASEDIR/$TARG/$KERNELVER"
-			if [ $(echo $KERNELVER | grep libc) ]; then
+			QuietExec "cd $BASEDIR/$TARG/$KERNEL"
+			if [ $(echo $KERNEL | grep libc) ]; then
 				ExecuteCmd "cp -r include/linux $HEADERSDIR"
 				#ExecuteCmd "cp -r include/asm-generic $HEADERSDIR/asm-generic"
 				ExecuteCmd "cp -r include/asm-$GENERICTARG $HEADERSDIR/asm"

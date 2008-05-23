@@ -146,6 +146,7 @@ SetOptions()
 	NEWLIB="newlib-$NEWLIBVER"
 	GLIBC="glibc-$GLIBCVER"
 	UCLIBC="uClibc-$UCLIBCVER"
+	KERNEL="$KERNELNAME-$KERNELVER"
 
 	# Binutils patches
 	BINPATCH=$(ls $PATCHDIR/$BINUTILS-* 2> /dev/null)
@@ -472,7 +473,7 @@ ParseArgs()
 			;;
 		"-cg")
 			Remove $GLIBCDIR
-			ConfigureGlibc "Initial"
+			ConfigureGlibc "Headers"
 			return 0
 			;;
 		"-c2g")

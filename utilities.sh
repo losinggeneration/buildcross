@@ -255,14 +255,14 @@ Download()
 				QuietExec "touch .$GLIBC-downloaded"
 			fi
 			;;
-		"$KERNELVER")
-			if ! CheckExists .$KERNELVER-downloaded || ! CheckExists $KERNELVER.tar.bz2; then
-				if [ $(echo $KERNELVER | grep libc) ]; then
-					ExecuteCmd "wget -c http://ep09.pld-linux.org/~mmazur/linux-libc-headers/$KERNELVER.tar.bz2"
+		"$KERNELNAME")
+			if ! CheckExists .$KERNEL-downloaded || ! CheckExists $KERNEL.tar.bz2; then
+				if [ $(echo $KERNEL | grep libc) ]; then
+					ExecuteCmd "wget -c http://ep09.pld-linux.org/~mmazur/linux-libc-headers/$KERNEL.tar.bz2"
 				else
-					ExecuteCmd "wget -c http://www.kernel.org/pub/linux/kernel/v2.6/$KERNELVER.tar.bz2"
+					ExecuteCmd "wget -c http://www.kernel.org/pub/linux/kernel/v2.6/$KERNEL.tar.bz2"
 				fi
-				QuietExec "touch .$KERNELVER-downloaded"
+				QuietExec "touch .$KERNEL-downloaded"
 			fi
 			;;
 		"kos")

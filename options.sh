@@ -558,7 +558,7 @@ ParseArgs()
 			return 0
 			;;
 		"gamecube")
-			LogFatel "Gamecube disabled"
+#			LogFatal "Gamecube disabled"
 			SetOptions Gamecube
 			return 0
 			;;

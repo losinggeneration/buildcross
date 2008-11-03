@@ -1,1 +1,3 @@
 Please checkout the tag v1.7.1 since master is known to be broken. It's where I'm working on gcc-4.x support for KOS. Things are broken for the Dreamcast build. So until things are fixed, v1.7.1 should be used.
+
+There is also a kos-stable branch which includes more fixes and is actively updated which I would suggest over the v1.7.1 version.

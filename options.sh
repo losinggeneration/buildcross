@@ -79,6 +79,9 @@ if [ ! "$TWOPASS" ]; then
 	TWOPASS=0
 fi
 
+# This can cause problems if set, so unset it for this script
+unset C_INCLUDE_PATH
+
 ###############################################################################
 # Color definitions
 ###############################################################################

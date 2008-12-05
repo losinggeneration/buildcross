@@ -223,6 +223,7 @@ Usage()
 	LogOutput "	gclinux Build a GameCube Linux compiler"
 	LogOutput "	ix86 Build Gcc for i686"
 	LogOutput "	archlinuxppc Build Gcc for ArchLinuxPPC"
+	LogOutput "	saturn Build Gcc for Sega Saturn"
 	LogOutput
 	LogOutput "	The following will be executed in order from left to right"
 	LogOutput "	-ci Clean \$INSTALL (typically /usr/local/{dc,dc-linux,gamecube}"
@@ -247,6 +248,8 @@ Usage()
 	LogOutput
 	LogOutput "	-cn Run configure for Newlib"
 	LogOutput "	-bn Build and install Newlib"
+	LogOutput
+	LogOutput "	-ck Configure/install kernel headers"
 	LogOutput
 	LogOutput "	-cu Run configure on uClibc"
 	LogOutput "	-bu Build and install uClibc"
@@ -464,6 +467,10 @@ ParseArgs()
 			BuildNewlib
 			return 0
 			;;
+		"-ck")
+			ConfigureKernelHeaders
+			return 0
+			;;
 		"-cu")
 			ExecuteCmd "rm -f $UCLIBCDIR/.configure"
 			ConfigureuClibc
@@ -583,6 +590,10 @@ ParseArgs()
 			;;
 		"sh2")
 			SetOptions sh2
+			return 0
+			;;
+		"saturn")
+			SetOptions Saturn
 			return 0
 			;;
 		"-distclean")

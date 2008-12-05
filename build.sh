@@ -123,8 +123,15 @@ BuildGcc()
 		QuietExec "cd $BASEDIR/$GCCBUILD"
 
 		if [ "$1" == "Initial" ]; then
-			ExecuteCmd "$MAKE all-gcc"
-			ExecuteCmd "$MAKE install-gcc" "Building $1 Gcc"
+			# Gcc 4.3.2 doesn't seem to install libgcc with install-gcc
+			# XXX This should be put into a patch to the Makefile instead
+			if [ "$GCCVER" != "4.3.2" ]; then
+				ExecuteCmd "$MAKE all-gcc"
+				ExecuteCmd "$MAKE install-gcc" "Building $1 Gcc"
+			else
+				ExecuteCmd "$MAKE all-gcc all-target-libgcc"
+				ExecuteCmd "$MAKE install-gcc install-target-libgcc"
+			fi
 		else
 			ExecuteCmd "$MAKE all"
 			ExecuteCmd "$MAKE install" "Building $1 Gcc"
@@ -220,16 +227,10 @@ BuildNewlib()
 	QuietExec "cd $BASEDIR"
 }
 
-###############################################################################
-# Configure uClibc
-###############################################################################
-ConfigureuClibc()
+ConfigureKernelHeaders()
 {
-	LogTitle "Configuring uClibc"
-	UntarPatch uClibc $UCLIBCVER $UCLIBCPATCH
-	UntarPatch $KERNELNAME $KERNELVER $KERNELPATCH
-
-	if ! CheckExists $UCLIBCDIR/.configure; then
+	# this if statemest probably isn't needed
+	if [ "$USEUCLIBC" ]; then
 		QuietExec "cd $TARG/$KERNEL"
 
 		if [ $(echo $KERNEL | grep libc) ]; then
@@ -254,6 +255,29 @@ ConfigureuClibc()
 			# isn't this so much nicer?
 			ExecuteCmd "make ARCH=$GENERICTARG CROSS_COMPILE=$TARG- INSTALL_HDR_PATH=$SYSROOT/usr headers_install"
 		fi
+	else
+		QuietExec "cd $BASEDIR/$TARG/$KERNEL"
+		if [ $(echo $KERNEL | grep libc) ]; then
+			ExecuteCmd "cp -r include/linux $HEADERSDIR"
+			#ExecuteCmd "cp -r include/asm-generic $HEADERSDIR/asm-generic"
+			ExecuteCmd "cp -r include/asm-$GENERICTARG $HEADERSDIR/asm"
+		else
+			ExecuteCmd "make ARCH=$GENERICTARG CROSS_COMPILE=$TARG- INSTALL_HDR_PATH=$SYSROOT/usr headers_install"
+		fi
+	fi
+}
+
+###############################################################################
+# Configure uClibc
+###############################################################################
+ConfigureuClibc()
+{
+	LogTitle "Configuring uClibc"
+	UntarPatch uClibc $UCLIBCVER $UCLIBCPATCH
+	UntarPatch $KERNELNAME $KERNELVER $KERNELPATCH
+
+	if ! CheckExists $UCLIBCDIR/.configure; then
+		ConfigureKernelHeaders "uclibc"
 
 		QuietExec "cd $BASEDIR"
 
@@ -265,7 +289,7 @@ ConfigureuClibc()
 
 		sed -e "s,KERNELSOURCEDIR,$SYSROOT/usr/include," -e "s,COMPILERPREFIX,$TARG-," -e "s,SHAREDLIBPREFIX,$UCLIBCHDIR," -e "s,RUNDEVPREFIX,$UCLIBCHDIR/usr," $PATCHDIR/$UCLIBC-config > .config
 
-		ExecuteCmd "make PREFIX=$UCLIBCHDIR DEVEL_PREFIX=/usr/ RUNTIME_PREFIX=$UCLIBCHDIR pregen install_dev"
+		ExecuteCmd "make V=1 PREFIX=$UCLIBCHDIR DEVEL_PREFIX=/usr/ RUNTIME_PREFIX=$UCLIBCHDIR pregen install_headers"
 		QuietExec "touch .configure"
 	else
 		LogTitle "uClibc already configured"
@@ -292,7 +316,8 @@ BuilduClibc()
 		cd $INSTALL/$TARG
 		ExecuteCmd "ln -snf ../include sys-include"
 		ExecuteCmd "ln -snf ../include include"
-		ExecuteCmd "cp -r lib/* ../lib"
+		# this can safely fail without consequence
+		cp -r lib/* ../lib
 		ExecuteCmd "rm -fr lib"
 		ExecuteCmd "ln -snf ../lib lib"
 		cd -
@@ -319,14 +344,7 @@ ConfigureGlibc()
 		QuietExec "cd $BASEDIR/$GCLIBCDIR"
 		if [ "$1" == "Headers" ]; then
 			# Prepare the linux headers
-			QuietExec "cd $BASEDIR/$TARG/$KERNEL"
-			if [ $(echo $KERNEL | grep libc) ]; then
-				ExecuteCmd "cp -r include/linux $HEADERSDIR"
-				#ExecuteCmd "cp -r include/asm-generic $HEADERSDIR/asm-generic"
-				ExecuteCmd "cp -r include/asm-$GENERICTARG $HEADERSDIR/asm"
-			else
-				ExecuteCmd "make ARCH=$GENERICTARG CROSS_COMPILE=$TARG- INSTALL_HDR_PATH=$SYSROOT/usr headers_install"
-			fi
+			ConfigureKernelHeaders
 
 			# Now get the Glibc headers installed
 			QuietExec "cd $BASEDIR/$GLIBCDIR"

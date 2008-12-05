@@ -432,9 +432,9 @@ DistClean()
 ###############################################################################
 CheckDeps()
 {
-	if test ! "$(./config.guess | grep -i linux)"; then
-		LogFatal "Sorry, Checking for dependencies is only known to work in Linux... for now"
-	fi
+#	if test ! "$(./config.guess | grep -i 'linux|darwin')"; then
+#		LogFatal "Sorry, Checking for dependencies is only known to work in Linux and OS X... for now"
+#	fi
 
 	# If a dependency is not found, it's put in this variable
 	local NOTFOUND=""

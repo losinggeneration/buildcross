@@ -224,6 +224,7 @@ Usage()
 	LogOutput "	ix86 Build Gcc for i686"
 	LogOutput "	archlinuxppc Build Gcc for ArchLinuxPPC"
 	LogOutput "	saturn Build Gcc for Sega Saturn"
+	LogOutput "	gba Build Gcc for Game Boy Advance"
 	LogOutput
 	LogOutput "	The following will be executed in order from left to right"
 	LogOutput "	-ci Clean \$INSTALL (typically /usr/local/{dc,dc-linux,gamecube}"
@@ -582,6 +583,14 @@ ParseArgs()
 			;;
 		"archlinuxppc")
 			SetOptions ArchLinuxPPC
+			return 0
+			;;
+		"gba")
+			SetOptions Gba
+			return 0
+			;;
+		"armlinux")
+			SetOptions ArmLinux
 			return 0
 			;;
 		"sffl")

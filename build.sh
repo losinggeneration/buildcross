@@ -123,15 +123,21 @@ BuildGcc()
 		QuietExec "cd $BASEDIR/$GCCBUILD"
 
 		if [ "$1" == "Initial" ]; then
-			# Gcc 4.3.2 doesn't seem to install libgcc with install-gcc
-			# XXX This should be put into a patch to the Makefile instead
-			if [ "$GCCVER" != "4.3.2" ]; then
-				ExecuteCmd "$MAKE all-gcc"
-				ExecuteCmd "$MAKE install-gcc" "Building $1 Gcc"
-			else
-				ExecuteCmd "$MAKE all-gcc all-target-libgcc"
-				ExecuteCmd "$MAKE install-gcc install-target-libgcc"
+			# Ok, Gcc 4.3 seems to change all-gcc's behavior. It's now split
+			# into all-gcc and all-target-libgcc. So now we have to check for
+			# newer versions.
+			GCCMAJOR="`echo $GCCVER | cut -d. -f1`"
+			GCCMINOR="`echo $GCCVER | cut -d. -f2`"
+
+			local GCCBUILD="all-gcc"
+			local GCCINSTALL="install-gcc"
+			if [ "$GCCMAJOR" = "4" -a "$GCCMINOR" -ge 3 ]; then
+				GCCBUILD="$GCCBUILD all-target-libgcc all-libiberty"
+				GCCINSTALL="$GCCINSTALL install-target-libgcc install-libiberty"
 			fi
+
+			ExecuteCmd "$MAKE $GCCBUILD"
+			ExecuteCmd "$MAKE $GCCINSTALL" "Building $1 Gcc"
 		else
 			ExecuteCmd "$MAKE all"
 			ExecuteCmd "$MAKE install" "Building $1 Gcc"

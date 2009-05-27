@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ###############################################################################
 # Copyright 2000-2007
 #         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
@@ -48,12 +48,6 @@ BuildBin()
 		QuietExec "cd $BASEDIR/$BINBUILD"
 
 		ExecuteCmd "$MAKE all"
-
-		# This is kind of hacky
-		# Not needed anymore?
-#		if [ "$HOSTPRE" ]; then
-#			ExecuteCmd "sed \"s/SUBDIRS = doc po/SUBDIRS = po/\" -i bfd/Makefile"
-#		fi
 
 		ExecuteCmd "$MAKE install" "Building Binutils"
 		if [ "$SHELF" ]; then
@@ -177,7 +171,7 @@ ConfigureNewlib()
 BuildNewlib()
 {
 	LogTitle "Building Newlib"
-	if ! CheckExists $NEWLIBBUILD/.installed; then
+	if ! CheckExists $BASEDIR/$NEWLIBBUILD/.installed; then
 		QuietExec "cd $BASEDIR/$NEWLIBBUILD"
 
 		ExecuteCmd "$MAKE"
@@ -201,21 +195,12 @@ BuildNewlib()
 				# file.
 				###############################################################
 				LogTitle "Symlinking KOS libraries..."
-				if [ $(echo $GCC | cut -b5) -le 3 ]; then
-					# KOS pthread.h is modified
-					ExecuteCmd "cp $KOSLOCATION/include/pthread.h $INSTALL/$TARG/include"
-					# to define _POSIX_THREADS
-					ExecuteCmd "cp $KOSLOCATION/include/sys/_pthread.h $INSTALL/$TARG/include/sys"
-					# pthreads to kthreads mapping
-					ExecuteCmd "cp $KOSLOCATION/include/sys/sched.h $INSTALL/$TARG/include/sys"
-				else
-					if [ -e "$PATCHDIR/$NEWLIB-_pthread.h" ]; then
-						ExecuteCmd "cp $PATCHDIR/$NEWLIB-_pthread.h $INSTALL/$TARG/include/sys/_pthread.h"
-					fi
-					if [ -e "$PATCHDIR/$NEWLIB-_types.h" ]; then
-						ExecuteCmd "cp $PATCHDIR/$NEWLIB-_types.h $INSTALL/$TARG/include/sys/_types.h"
-					fi
-				fi
+				# KOS pthread.h is modified
+				ExecuteCmd "cp $KOSLOCATION/include/pthread.h $INSTALL/$TARG/include"
+				# to define _POSIX_THREADS
+				ExecuteCmd "cp $KOSLOCATION/include/sys/_pthread.h $INSTALL/$TARG/include/sys"
+				# pthreads to kthreads mapping
+				ExecuteCmd "cp $KOSLOCATION/include/sys/sched.h $INSTALL/$TARG/include/sys"
 				# so KOS includes are available as kos/file.h
 				ExecuteCmd "ln -nsf $KOSLOCATION/include/kos $INSTALL/$TARG/include"
 				# kos/thread.h requires arch/arch.h
@@ -225,7 +210,7 @@ BuildNewlib()
 			fi
 		fi
 
-		QuietExec "touch .installed"
+		QuietExec "touch $BASEDIR/$NEWLIBBUILD/.installed"
 	else
 		LogTitle "Newlib already installed"
 	fi
@@ -355,7 +340,7 @@ ConfigureGlibc()
 			# Now get the Glibc headers installed
 			QuietExec "cd $BASEDIR/$GLIBCDIR"
 
-			CC=gcc ExecuteCmd "../$GLIBC/configure $GLIBCHOPTS" "Configuring Glibc Headers" 
+			CC=gcc ExecuteCmd "../$GLIBC/configure $GLIBCHOPTS" "Configuring Glibc Headers"
 			ExecuteCmd "$MAKE cross-compiling=yes install_root=$SYSROOT install-headers" "Installing Glibc Headers"
 
 			# Taken/adapted from CrossTool

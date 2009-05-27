@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ###############################################################################
 # Copyright 2000-2007
 #         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
@@ -597,8 +597,8 @@ TestAll()
 	SetOptions Dreamcast
 	BuildDreamcast
 	QuietExec "cd $BASEDIR"
-#	SetOptions Gamecube
-#	All
+	SetOptions Gamecube
+	All
 	BuildLinux DcLinux
 	QuietExec "cd $BASEDIR"
 #	SetOptions Genesis

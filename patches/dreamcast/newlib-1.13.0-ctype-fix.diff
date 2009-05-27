@@ -1,0 +1,59 @@
+diff -urN newlib-1.13.0/newlib/libc/ctype/ctype_.c newlib-1.13.0.ctype_/newlib/libc/ctype/ctype_.c
+--- newlib-1.13.0/newlib/libc/ctype/ctype_.c	2003-05-13 04:46:47.000000000 -0500
++++ newlib-1.13.0.ctype_/newlib/libc/ctype/ctype_.c	2009-05-27 13:15:18.699069559 -0500
+@@ -84,25 +84,47 @@
+ 	_CTYPE_DATA_128_256
+ };
+ 
+-#if defined(__CYGWIN__)
+-extern _CONST char __declspec(dllexport) _ctype_[1 + 256] __attribute__ ((alias ("_ctype_b+127")));
++#  if defined(__CYGWIN__)
+ _CONST char __declspec(dllexport) *__ctype_ptr = _ctype_b + 128;
+-#else
+-extern _CONST char _ctype_[1 + 256] __attribute__ ((alias ("_ctype_b+127")));
++_CONST char __declspec(dllexport) *__ctype_ptr__ = _ctype_b + 127;
++#  else
+ _CONST char *__ctype_ptr = _ctype_b + 128;
+-#endif
++_CONST char *__ctype_ptr__ = _ctype_b + 127;
++#  endif
++
++#  if defined(_HAVE_ARRAY_ALIASING)
++
++#    if defined(__CYGWIN__)
++extern _CONST char __declspec(dllexport) _ctype_[1 + 256] __attribute__ ((alias ("_ctype_b+127")));
++#    else
++extern _CONST char _ctype_[1 + 256] __attribute__ ((alias ("_ctype_b+127")));
++#    endif
++
++#  else /* !_HAVE_ARRAY_ALIASING */
++
++#    if defined(__CYGWIN__)
++_CONST char __declspec(dllexport) _ctype_[1 + 256] = {
++#    else
++_CONST char _ctype_[1 + 256] = {
++#    endif
++	0,
++	_CTYPE_DATA_0_127,
++	_CTYPE_DATA_128_256
++};
++#  endif /* !_HAVE_ARRAY_ALIASING */
+ 
+ #else	/* !defined(ALLOW_NEGATIVE_CTYPE_INDEX) */
+ 
+-#if defined(__CYGWIN__)
++# if defined(__CYGWIN__)
+ _CONST char __declspec(dllexport) _ctype_[1 + 256] = {
+-#else
++# else
+ _CONST char _ctype_[1 + 256] = {
+-#endif
++# endif
+ 	0,
+ 	_CTYPE_DATA_0_127,
+ 	_CTYPE_DATA_128_256
+ };
+ 
+ _CONST char *__ctype_ptr = _ctype_ + 1;
++_CONST char *__ctype_ptr__ = _ctype_;
+ #endif

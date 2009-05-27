@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ###############################################################################
 # Copyright 2000-2007
 #         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
@@ -569,7 +569,6 @@ ParseArgs()
 			return 0
 			;;
 		"gamecube")
-#			LogFatal "Gamecube disabled"
 			SetOptions Gamecube
 			return 0
 			;;

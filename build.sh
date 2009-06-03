@@ -280,7 +280,7 @@ ConfigureuClibc()
 
 		sed -e "s,KERNELSOURCEDIR,$SYSROOT/usr/include," -e "s,COMPILERPREFIX,$TARG-," -e "s,SHAREDLIBPREFIX,$UCLIBCHDIR," -e "s,RUNDEVPREFIX,$UCLIBCHDIR/usr," $PATCHDIR/$UCLIBC-config > .config
 
-		ExecuteCmd "make V=1 PREFIX=$UCLIBCHDIR DEVEL_PREFIX=/usr/ RUNTIME_PREFIX=$UCLIBCHDIR pregen install_headers"
+		ExecuteCmd "make V=1 PREFIX=$UCLIBCHDIR DEVEL_PREFIX=/usr/ RUNTIME_PREFIX=$UCLIBCHDIR headers install_headers"
 		QuietExec "touch .configure"
 	else
 		LogTitle "uClibc already configured"

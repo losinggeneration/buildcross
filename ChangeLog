@@ -197,7 +197,8 @@ Version 1.8:
 	-Gcc downloads should now overall be smaller in most cases since it's  now
 	 downloaded as gcc-core, gcc-g++, gcc-java, etc.
 	-Most targets should now work with changed Gcc behavior.
-	-Dreamcast now uses GCC 4.4.0 by default (good work on that BlueCrab)
+	-Dreamcast now has GCC 4.4.0 which can be enabled if desired (good work
+	 on that BlueCrab) 1.8.1 will most likely use this as the default.
 	-Misc version bumps
 	-Added a Gba and Arm Linux target (experimental)
 	-Version bumps to SFFL

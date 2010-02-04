@@ -303,7 +303,8 @@ BuilduClibc()
 		# Ok, building went ok, so install the libs and includes
 		# to the right prefix
 		ExecuteCmd "cp -r $UCLIBCHDIR/usr/include $INSTALL"
-		ExecuteCmd "cp -r $UCLIBCHDIR/usr/lib/* $INSTALL/lib"
+		# this command sometimes fails, no big deal...
+		cp -r $UCLIBCHDIR/usr/lib/* $INSTALL/lib
 		cd $INSTALL/$TARG
 		ExecuteCmd "ln -snf ../include sys-include"
 		ExecuteCmd "ln -snf ../include include"

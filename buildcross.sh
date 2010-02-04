@@ -23,11 +23,11 @@ BUILDCROSS_VERSION=1.7
 # To reduce clutter I've moved functions into separate files.
 # These will include the functions so we can call them from  here.
 ###############################################################################
-# Options Parser, Usage, and Examples
-source options.sh
-
 # utilities include making directories, downloading, patching etc
 source utilities.sh
+
+# Options Parser, Usage, and Examples
+source options.sh
 
 # how to configure/build each (Binutils, Gcc, Newlib, uClibc, & KOS)
 source build.sh

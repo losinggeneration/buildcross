@@ -536,6 +536,7 @@ ParseArgs()
 			;;
 		"-s")
 			SILENT=1
+			RemoveColorize
 			return 0
 			;;
 		"-e")

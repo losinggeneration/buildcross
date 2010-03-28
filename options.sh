@@ -131,17 +131,17 @@ SetOptions()
 	# Load the default values per config
 	source options/$1.cfg
 
-	# These are potentially unset, so make sure they're set to at least $TARG/
+	# These are potentially unset, so make sure they're set to at least $SYSTEM/
 	if [ ! "$NEWLIBBUILD" ]; then
-		NEWLIBBUILD=$TARG
+		NEWLIBBUILD=$SYSTEM
 	fi
 
 	if [ ! "$UCLIBCDIR" ]; then
-		UCLIBCDIR=$TARG
+		UCLIBCDIR=$SYSTEM
 	fi
 
 	if [ ! "$CLIBCHDIR" ]; then
-		CLIBCHDIR=$TARG
+		CLIBCHDIR=$SYSTEM
 	fi
 
 	BINUTILS="binutils-$BINVER"
@@ -192,9 +192,9 @@ SetOptions()
 	GLIBCFOPTS="--host=$TARG $TARGET $BUILD --prefix=/usr $GLIBCFOPTS"
 
 	# Set up directory names
-	BINBUILD="$TARG/binbuildelf"
-	GCCBUILD="$TARG/gccbuildelf"
-	NEWLIBBUILD="$TARG/newlibbuildelf"
+	BINBUILD="$SYSTEM/binbuildelf"
+	GCCBUILD="$SYSTEM/gccbuildelf"
+	NEWLIBBUILD="$SYSTEM/newlibbuildelf"
 
 	# If the install directory doesn't exist make it
 	if [ ! -d $INSTALL ]; then
@@ -550,7 +550,7 @@ ParseArgs()
 			return 0
 			;;
 		"-i")
-			rm $TARG-*/.*installed*
+			rm $SYSTEM/*/.*installed*
 			return 0
 			;;
 		"dreamcast")

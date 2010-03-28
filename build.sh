@@ -533,19 +533,19 @@ CleaningAll()
 	ConfigureBin
 	BuildBin
 	CleaningRemove $BINBUILD
-	QuietExec "rm -fr $BASEDIR/$TARG/$BINUTILS"
+	QuietExec "rm -fr $BASEDIR/$SYSTEM/$BINUTILS"
 	ConfigureGcc "Initial"
 	BuildGcc "Initial"
 	CleaningRemove $GCCBUILD
-	QuietExec "rm -fr $BASEDIR/$TARG/$GCC"
+	QuietExec "rm -fr $BASEDIR/$SYSTEM/$GCC"
 	ConfigureNewlib
 	BuildNewlib
 	CleaningRemove $NEWLIBBUILD
-	QuietExec "rm -fr $BASEDIR/$TARG/$NEWLIB"
+	QuietExec "rm -fr $BASEDIR/$SYSTEM/$NEWLIB"
 	ConfigureGcc "Final"
 	BuildGcc "Final"
 	CleaningRemove $GCCBUILD
-	QuietExec "rm -fr $BASEDIR/$TARG/$GCC"
+	QuietExec "rm -fr $BASEDIR/$SYSTEM/$GCC"
 }
 
 ###############################################################################
@@ -592,11 +592,11 @@ BuildCleaningDreamcast()
 		ConfigureBin
 		BuildBin
 		CleaningRemove $BINBUILD
-		QuietExec "rm -fr $BASEDIR/$TARG/$BINUTILS"
+		QuietExec "rm -fr $BASEDIR/$SYSTEM/$BINUTILS"
 		ConfigureGcc "Initial"
 		BuildGcc "Initial"
 		CleaningRemove $GCCBUILD
-		QuietExec "rm -fr $BASEDIR/$TARG/$GCC"
+		QuietExec "rm -fr $BASEDIR/$SYSTEM/$GCC"
 	fi
 
 	BuildKos

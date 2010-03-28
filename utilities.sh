@@ -152,7 +152,7 @@ UntarPatch()
 
 	# check if the directory for the source exists
 	# and that we got to touch that it's untared
-	if [ ! -d $TARG/$1-$2 -o ! -e $TARG/$1-$2/.untared-$2 ]; then
+	if [ ! -d $SYSTEM/$1-$2 -o ! -e $SYSTEM/$1-$2/.untared-$2 ]; then
 		Untar $1 $2
 	fi
 
@@ -174,7 +174,7 @@ GccUntar()
 
 	# check if the directory for the source exists
 	# and that we got to touch that it's untared
-	if [ ! -d $TARG/$GCC -o ! -e $TARG/$GCC/.untared-$2-$1 ]; then
+	if [ ! -d $SYSTEM/$GCC -o ! -e $SYSTEM/$GCC/.untared-$2-$1 ]; then
 		Untar gcc $GCCVER $2
 	fi
 }
@@ -198,17 +198,17 @@ Untar()
 		# if it doesn't try for tar.gz
 		if CheckExists $1-$lver.tar.gz; then
 			# We have the tar.gz hooray
-			ExecuteCmd "tar xfz $1-$lver.tar.gz -C $TARG" "Untaring $1-$lver.tar.gz"
+			ExecuteCmd "tar xfz $1-$lver.tar.gz -C $SYSTEM" "Untaring $1-$lver.tar.gz"
 		fi
 	elif CheckExists $1-$lver.tar.bz2; then
 		# Well we have the tar.bz2 good job
-		ExecuteCmd "tar xfj $1-$lver.tar.bz2 -C $TARG" "Untaring $1-$lver.tar.bz2"
+		ExecuteCmd "tar xfj $1-$lver.tar.bz2 -C $SYSTEM" "Untaring $1-$lver.tar.bz2"
 	else
 		LogFatal "Cannot untar $1-$lver.tar.bz2 or $1-$lver.tar.gz. Make sure .$1-$lver-downloaded doesn't exist or the file might be corrupt. If you do get this message tell me how, because it seems like it shouldn't ever come up."
 	fi
 
 	# A quick way to tell if we need to untar or not
-	QuietExec "touch $TARG/$1-$2/.untared-$lver"
+	QuietExec "touch $SYSTEM/$1-$2/.untared-$lver"
 }
 
 ###############################################################################
@@ -242,7 +242,7 @@ Download()
 				elif [ $(echo $UCLIBC | grep "\." ) ]; then
 					ExecuteCmd "wget -c http://uclibc.org/downloads/$UCLIBC.tar.bz2"
 				else
-					QuietExec "cd $TARG"
+					QuietExec "cd $SYSTEM"
 					ExecuteCmd "svn co svn://uclibc.org/trunk/uClibc"
 					QuietExec "cd .."
 				fi
@@ -296,7 +296,7 @@ Patch()
 	elif [ $1 == "kos-ports" ]; then
 		LOC=$KOSLOCATION/../kos-ports
 	else
-		LOC=$BASEDIR/$TARG/$1-$2
+		LOC=$BASEDIR/$SYSTEM/$1-$2
 	fi
 
 	# We need to get past the name/version so shift the params two or three
@@ -414,17 +414,17 @@ DistClean()
 	find . -name "*~" -exec rm {} \;
 	ExecuteCmd "rm -fr .linux-* .binutils-* .gcc-* .uClibc-* .newlib-* *.bz2 *.gz"
 	SetOptions Dreamcast
-	ExecuteCmd "rm -fr $TARG"
+	ExecuteCmd "rm -fr $SYSTEM"
 	SetOptions Gamecube
-	ExecuteCmd "rm -fr $TARG"
+	ExecuteCmd "rm -fr $SYSTEM"
 	SetOptions DcLinux
-	ExecuteCmd "rm -fr $TARG"
+	ExecuteCmd "rm -fr $SYSTEM"
 	SetOptions Genesis
-	ExecuteCmd "rm -fr $TARG"
+	ExecuteCmd "rm -fr $SYSTEM"
 	SetOptions GcLinux
-	ExecuteCmd "rm -fr $TARG"
+	ExecuteCmd "rm -fr $SYSTEM"
 	SetOptions Ix86
-	ExecuteCmd "rm -fr $TARG"
+	ExecuteCmd "rm -fr $SYSTEM"
 }
 
 ###############################################################################

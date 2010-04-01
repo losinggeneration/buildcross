@@ -222,7 +222,7 @@ ConfigureKernelHeaders()
 {
 	# this if statemest probably isn't needed
 	if [ "$USEUCLIBC" ]; then
-		QuietExec "cd $TARG/$KERNEL"
+		QuietExec "cd $SYSTEM/$KERNEL"
 
 		if [ $(echo $KERNEL | grep libc) ]; then
 			# If it's the old headers, we we'll cd to include

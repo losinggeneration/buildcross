@@ -1,0 +1,37 @@
+This project is to assist in building various cross compilers:
+Fully supported cross compilers are that should build and work correctly:
+* Dreamcast (sh-elf and arm-elf for KOS)
+* Dreamcast Linux (sh4-linux-uclibc or sh4-linux-gnu)
+* Gamecube (builds pretty much the same compiler as devkitpro)
+* Gamecube Linux (powerpc-gekko-linux-uclibc or powerpc-gekko-linux-gnu)
+
+Others that may or maynot work:
+* Genesis
+* Saturn
+* ArchLinux PPC
+* Arm Linux
+* GBA
+* Ix86
+* SH2
+
+Usage:
+The help should give most of the info needed to get started
+./buildcross.sh -h
+And this will give even more info and examples
+./buildcross -e
+
+Some highlights:
+Build the Dreamcast compiler:
+./buildcross.sh -dc
+Build the Gamecube compiler:
+./buildcross.sh gamecube -all
+Build a Dreamcast Linux compiler with glibc:
+./buildcross.sh -dcl
+Build a Dreamcast Linux compiler with uclibc:
+./buildcross.sh -u -dcl
+
+Same as above but using the system name
+Build a Dreamcast Linux compiler with glibc:
+./buildcross.sh dclinux -bl
+Build a Dreamcast Linux compiler with uclibc:
+./buildcross.sh -u dclinux -dcl

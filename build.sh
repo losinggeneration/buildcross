@@ -576,7 +576,7 @@ SinglePass()
 	BuildGcc "Final"
 
 	if [ $TARG = "avr" ]; then
-		HOST="--build=avr"
+		AVRLIBCOPTS="$AVRLIBCOPTS --host=avr"
 		ConfigureAVRlibc
 		BuildAVRlibc
 	fi

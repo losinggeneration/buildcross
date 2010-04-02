@@ -605,6 +605,10 @@ ParseArgs()
 			SetOptions Saturn
 			return 0
 			;;
+		"avr")
+			SetOptions Avr
+			return 0
+			;;
 		"-distclean")
 			DistClean
 			return 0

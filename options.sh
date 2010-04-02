@@ -147,6 +147,7 @@ SetOptions()
 	BINUTILS="binutils-$BINVER"
 	GCC="gcc-$GCCVER"
 	NEWLIB="newlib-$NEWLIBVER"
+	AVRLIBC="avr-libc-$AVRLIBCVER"
 	GLIBC="glibc-$GLIBCVER"
 	UCLIBC="uClibc-$UCLIBCVER"
 	KERNEL="$KERNELNAME-$KERNELVER"
@@ -165,6 +166,7 @@ SetOptions()
 	GLIBCPATCH=$(ls $PATCHDIR/$GLIBC-* 2> /dev/null)
 	# uClibc patches
 	UCLIBCPATCH=$(ls $PATCHDIR/$UCLIBC-* 2> /dev/null)
+	AVRLIBCPATCH=$(ls $PATCHDIR/$AVRLIBC-* 2> /dev/null)
 
 	# Now we can setup everything else by the variables defined above
 	#################################################################
@@ -187,6 +189,7 @@ SetOptions()
 	GCCBOPTS="$TARGET $HOST $PREFIX $GCCBOPTS"
 	NEWLIBOPTS="$TARGET $HOST $PREFIX $NEWLIBOPTS"
 	GCCFOPTS="$TARGET $HOST $PREFIX $GCCFOPTS"
+	AVRLIBCOPTS="$TARGET $HOST $PREFIX $AVRLIBCOPTS"
 	# Glibc's prefix must be /usr because we use sysroot
 	GLIBCHOPTS="$TARGET $HOST $BUILD --prefix=/usr $GLIBCHOPTS"
 	GLIBCFOPTS="--host=$TARG $TARGET $BUILD --prefix=/usr $GLIBCFOPTS"
@@ -195,6 +198,7 @@ SetOptions()
 	BINBUILD="$SYSTEM/binbuildelf"
 	GCCBUILD="$SYSTEM/gccbuildelf"
 	NEWLIBBUILD="$SYSTEM/newlibbuildelf"
+	AVRLIBCBUILD="$SYSTEM/avrlibcbuild"
 
 	# If the install directory doesn't exist make it
 	if [ ! -d $INSTALL ]; then
@@ -225,6 +229,7 @@ Usage()
 	LogOutput "	archlinuxppc Build Gcc for ArchLinuxPPC"
 	LogOutput "	saturn Build Gcc for Sega Saturn"
 	LogOutput "	gba Build Gcc for Game Boy Advance"
+	LogOutput "	avr Build Gcc for the Atmel AVR chips"
 	LogOutput
 	LogOutput "	The following will be executed in order from left to right"
 	LogOutput "	-ci Clean \$INSTALL (typically /usr/local/{dc,dc-linux,gamecube}"
@@ -238,6 +243,7 @@ Usage()
 	LogOutput "	-all Configure and build all in correct order"
 	LogOutput "	-allc Configure and build all in correct order, but clean"
 	LogOutput "       objects and remove source after each is built"
+	LogOutput "	-single Run a single pass. Equivilant to -cb -bb -cfg -bfg"
 	LogOutput
 	LogOutput "	-cb Run configure for binutils"
 	LogOutput "	-bb Build and install binutils"
@@ -428,6 +434,10 @@ ParseArgs()
 			CleanningAll
 			return 0
 			;;
+		"-single")
+			SinglePass
+			return 0
+			;;
 		"-cb")
 			Remove $BINBUILD
 			ConfigureBin
@@ -470,6 +480,16 @@ ParseArgs()
 			;;
 		"-ck")
 			ConfigureKernelHeaders
+			return 0
+			;;
+		"-ca")
+			Remove "$AVRLIBCBUILD/.configure"
+			ConfigureAVRlibc
+			return 0
+			;;
+		"-ba")
+			Remove "$AVRLIBCBUILD/.installed"
+			BuildAVRlibc
 			return 0
 			;;
 		"-cu")

@@ -218,6 +218,45 @@ BuildNewlib()
 	QuietExec "cd $BASEDIR"
 }
 
+###############################################################################
+# Configure AVRlibc
+###############################################################################
+ConfigureAVRlibc()
+{
+	LogTitle "Configuring AVRlibc"
+
+	UntarPatch avr-libc $AVRLIBCVER $AVRLIBCPATCH
+
+	if ! CheckExists $AVRLIBCBUILD/.configure; then
+		Remove $AVRLIBCBUILD
+		QuietExec "cd $BASEDIR/$AVRLIBCBUILD"
+
+		ExecuteCmd "../$AVRLIBC/configure $AVRLIBCOPTS" "Configuring AVRlibc"
+		QuietExec "touch .configure"
+	else
+		LogTitle "AVRlibc already configured"
+	fi
+
+	QuietExec "cd $BASEDIR"
+}
+
+###############################################################################
+# Build and install AVRlibc
+###############################################################################
+BuildAVRlibc()
+{
+	LogTitle "Building AVRlibc"
+
+	if ! CheckExists $AVRLIBCBUILD/.installed; then
+		QuietExec "cd $BASEDIR/$AVRLIBCBUILD"
+
+		ExecuteCmd "$MAKE"
+		ExecuteCmd "$MAKE install" "Installing AVRlibc"
+	else
+		LogTitle "$1 AVRlibc already installed"
+	fi
+}
+
 ConfigureKernelHeaders()
 {
 	# this if statemest probably isn't needed
@@ -522,6 +561,24 @@ All()
 	BuildNewlib
 	ConfigureGcc "Final"
 	BuildGcc "Final"
+}
+
+###############################################################################
+# Some compilers really only need a single pass, AVR for example
+# TODO: We may want to have an option to compile newlib if desired
+###############################################################################
+SinglePass()
+{
+	LogTitle "Making a single pass compiler"
+	ConfigureBin
+	BuildBin
+	ConfigureGcc "Final"
+	BuildGcc "Final"
+
+	if [ $TARG = "avr" ]; then
+		ConfigureAVRlibc
+		BuildAVRlibc
+	fi
 }
 
 ###############################################################################

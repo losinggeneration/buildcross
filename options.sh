@@ -617,10 +617,6 @@ ParseArgs()
 			SetOptions sffl
 			return 0
 			;;
-		"sh2")
-			SetOptions sh2
-			return 0
-			;;
 		"saturn")
 			SetOptions Saturn
 			return 0

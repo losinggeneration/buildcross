@@ -136,6 +136,10 @@ CreateDir()
 	if [ ! -d $NEWLIBBUILD ]; then
 		QuietExec "mkdir -p $NEWLIBBUILD"
 	fi
+
+	if [ "$TARG" = "avr" -a ! -d $AVRLIBCBUILD ]; then
+		QuietExec "mkdir -p $AVRLIBCBUILD"
+	fi
 }
 
 ###############################################################################
@@ -253,6 +257,12 @@ Download()
 			if ! CheckExists .$GLIBC-downloaded || ! CheckExists $GLIBC.tar.bz2; then
 				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/glibc/$GLIBC.tar.bz2"
 				QuietExec "touch .$GLIBC-downloaded"
+			fi
+			;;
+		"avr-libc")
+			if ! CheckExists .$AVRLIBC-downloaded || ! CheckExists $AVRLIBC.tar.bz2; then
+				ExecuteCmd "wget -c http://savannah.nongnu.org/download/avr-libc/$AVRLIBC.tar.bz2"
+				QuietExec "touch .$AVRLIBC-downloaded"
 			fi
 			;;
 		"$KERNELNAME")

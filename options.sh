@@ -609,8 +609,16 @@ ParseArgs()
 			SetOptions Gba
 			return 0
 			;;
+		"arm")
+			SetOptions Arm
+			return 0
+			;;
 		"armlinux")
 			SetOptions ArmLinux
+			return 0
+			;;
+		"didj")
+			SetOptions Didj
 			return 0
 			;;
 		"sffl")

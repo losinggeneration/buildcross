@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Version: 0.9.30.3
-# Tue Apr  6 19:08:49 2010
+# Thu Apr  8 16:15:17 2010
 #
 # TARGET_alpha is not set
 TARGET_arm=y
@@ -36,14 +36,15 @@ TARGET_ARCH="arm"
 FORCE_OPTIONS_FOR_ARCH=y
 # CONFIG_ARM_OABI is not set
 CONFIG_ARM_EABI=y
-CONFIG_GENERIC_ARM=y
+USE_BX=y
+# CONFIG_GENERIC_ARM is not set
 # CONFIG_ARM610 is not set
 # CONFIG_ARM710 is not set
 # CONFIG_ARM7TDMI is not set
 # CONFIG_ARM720T is not set
 # CONFIG_ARM920T is not set
 # CONFIG_ARM922T is not set
-# CONFIG_ARM926T is not set
+CONFIG_ARM926T=y
 # CONFIG_ARM10T is not set
 # CONFIG_ARM1136JF_S is not set
 # CONFIG_ARM1176JZ_S is not set
@@ -92,12 +93,13 @@ UCLIBC_CTOR_DTOR=y
 # HAS_NO_THREADS is not set
 UCLIBC_HAS_THREADS=y
 # PTHREADS_DEBUG_SUPPORT is not set
-LINUXTHREADS_OLD=y
+# LINUXTHREADS_OLD is not set
+LINUXTHREADS_NEW=y
 UCLIBC_HAS_SYSLOG=y
 UCLIBC_HAS_LFS=y
-# MALLOC is not set
+MALLOC=y
 # MALLOC_SIMPLE is not set
-MALLOC_STANDARD=y
+# MALLOC_STANDARD is not set
 # MALLOC_GLIBC_COMPAT is not set
 UCLIBC_DYNAMIC_ATEXIT=y
 # COMPAT_ATEXIT is not set

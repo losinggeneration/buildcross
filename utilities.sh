@@ -316,6 +316,10 @@ Patch()
 		shift 2
 	fi
 
+	if [ ! "$PLEVEL" ]; then
+		PLEVEL=1
+	fi
+
 	if ! CheckExists $LOC/.patched; then
 		QuietExec "cd $LOC"
 		# Go through all parameters passed here which is
@@ -324,7 +328,7 @@ Patch()
 			# Only patch if the "if" includes a *.patch or a *.diff
 			if [ "`echo $i | grep -i '\.patch' | grep -v DISABLED`" -o \
 					"`echo $i | grep -i '\.diff' | grep -v DISABLED`" ]; then
-				ExecuteCmd "patch -p1 -i $i"
+				ExecuteCmd "patch -p$PLEVEL -i $i"
 			fi
 		done
 

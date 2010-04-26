@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ###############################################################################
 # Copyright 2000-2007
 #         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
@@ -13,7 +13,7 @@ SILENT=0
 # "Ix86"
 #SYSTEM="Dreamcast"
 # Directory to build from
-BASEDIR=$(pwd)
+BASEDIR="$(pwd)"
 # Where the patches are
 PATCHBASEDIR="$BASEDIR/patches"
 ###############################################################################
@@ -54,7 +54,7 @@ fi
 
 # Some custom CFLAGS to use
 if [ "$BCCFLAGS" ]; then
-	export CFLAGS=$BCCFLAGS
+	export CFLAGS="$BCCFLAGS"
 fi
 
 # Which languages gcc should build
@@ -129,19 +129,19 @@ SetOptions()
 	fi
 
 	# Load the default values per config
-	source options/$1.cfg
+	. ./options/$1.cfg
 
 	# These are potentially unset, so make sure they're set to at least $SYSTEM/
 	if [ ! "$NEWLIBBUILD" ]; then
-		NEWLIBBUILD=$SYSTEM
+		NEWLIBBUILD="$SYSTEM"
 	fi
 
 	if [ ! "$UCLIBCDIR" ]; then
-		UCLIBCDIR=$SYSTEM
+		UCLIBCDIR="$SYSTEM"
 	fi
 
 	if [ ! "$CLIBCHDIR" ]; then
-		CLIBCHDIR=$SYSTEM
+		CLIBCHDIR="$SYSTEM"
 	fi
 
 	BINUTILS="binutils-$BINVER"
@@ -201,7 +201,7 @@ SetOptions()
 	AVRLIBCBUILD="$SYSTEM/avrlibcbuild"
 
 	# If the install directory doesn't exist make it
-	if [ ! -d $INSTALL ]; then
+	if [ ! -d "$INSTALL" ]; then
 		QuietExec "mkdir -p $INSTALL"
 	fi
 

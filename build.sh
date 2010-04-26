@@ -178,8 +178,8 @@ BuildNewlib()
 		ExecuteCmd "$MAKE install" "Building Newlib"
 
 		# SHELF is defined in Dreamcast.cfg
-		if [ "$SHELF" ]; then
-			if [ $THREADS == "posix" -o $THREADS == "yes" ]; then
+		if [ "$USEKOS" ]; then
+			if [ "$THREADS" = "posix" -o "$THREADS" = "yes" -o "$THREADS" = "kos" ]; then
 				# Make sure KOS is downloaded before trying to copy files from
 				# it
 				QuietExec "mkdir -p $KOSLOCATION"
@@ -204,9 +204,9 @@ BuildNewlib()
 				# so KOS includes are available as kos/file.h
 				ExecuteCmd "ln -nsf $KOSLOCATION/include/kos $INSTALL/$TARG/include"
 				# kos/thread.h requires arch/arch.h
-				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/arch $INSTALL/$TARG/include"
+				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/$SYSTEM/include/arch $INSTALL/$TARG/include"
 				# arch/arch.h requires dc/video.h
-				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/dc $INSTALL/$TARG/include"
+				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/$SYSTEM/include/$KOSSYSINC $INSTALL/$TARG/include"
 			fi
 		fi
 

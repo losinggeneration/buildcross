@@ -585,6 +585,10 @@ ParseArgs()
 			SetOptions DcLinux
 			return 0
 			;;
+		"kos-arm")
+			SetOptions KosArm
+			return 0
+			;;
 		"genesis")
 			SetOptions Genesis
 			return 0

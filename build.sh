@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ###############################################################################
 # Copyright 2000-2007
 #         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
@@ -532,7 +532,7 @@ BuildKos()
 	#######################################################################
 
 	# Set environ.sh variables to use
-	source environ.sh
+	. ./environ.sh
 
 	Patch kos $KOSPATCH
 	QuietExec "cd $KOSLOCATION"

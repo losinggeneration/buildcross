@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ###############################################################################
 # Copyright 2000-2007
 #         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
@@ -83,7 +83,7 @@ Result()
 LogTitle()
 {
 	echo -e "$TEXTPREFIX## $TEXTTITLE$*$TEXTRESET"
-	if [ $SILENT -ne 0 ]; then
+	if [ "$SILENT" -ne 0 ]; then
 		echo "## $*" >> $SENDTOWHERE
 	fi
 }
@@ -93,7 +93,7 @@ LogTitle()
 ###############################################################################
 LogOutput()
 {
-	if [ $SILENT -eq 0 ]; then
+	if [ "$SILENT" -eq 0 ]; then
 		echo -e "$TEXTPREFIX:: $TEXTOUTPUT$*$TEXTRESET"
 	else
 		echo ":: $*" >> $SENDTOWHERE
@@ -106,7 +106,7 @@ LogOutput()
 LogError()
 {
 	echo -e "$TEXTPREFIX!! $TEXTERROR$*$TEXTRESET"
-	if [ $SILENT -ne 0 ]; then
+	if [ "$SILENT" -ne 0 ]; then
 		echo "!! $*" >> $ERRORTOWHERE
 	fi
 }
@@ -125,15 +125,15 @@ LogFatal()
 ###############################################################################
 CreateDir()
 {
-	if [ ! -d $BINBUILD ]; then
+	if [ ! -d "$BINBUILD" ]; then
 		QuietExec "mkdir -p $BINBUILD"
 	fi
 
-	if [ ! -d $GCCBUILD ]; then
+	if [ ! -d "$GCCBUILD" ]; then
 		QuietExec "mkdir -p $GCCBUILD"
 	fi
 
-	if [ ! -d $NEWLIBBUILD ]; then
+	if [ ! -d "$NEWLIBBUILD" ]; then
 		QuietExec "mkdir -p $NEWLIBBUILD"
 	fi
 
@@ -156,7 +156,7 @@ UntarPatch()
 
 	# check if the directory for the source exists
 	# and that we got to touch that it's untared
-	if [ ! -d $SYSTEM/$1-$2 -o ! -e $SYSTEM/$1-$2/.untared-$2 ]; then
+	if [ ! -d "$SYSTEM/$1-$2" -o ! -e "$SYSTEM/$1-$2/.untared-$2" ]; then
 		Untar $1 $2
 	fi
 
@@ -178,7 +178,7 @@ GccUntar()
 
 	# check if the directory for the source exists
 	# and that we got to touch that it's untared
-	if [ ! -d $SYSTEM/$GCC -o ! -e $SYSTEM/$GCC/.untared-$2-$1 ]; then
+	if [ ! -d "$SYSTEM/$GCC" -o ! -e "$SYSTEM/$GCC/.untared-$2-$1" ]; then
 		Untar gcc $GCCVER $2
 	fi
 }

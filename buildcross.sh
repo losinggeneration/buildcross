@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ###############################################################################
 # Copyright 2000-2007
 #         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
@@ -24,13 +24,13 @@ BUILDCROSS_VERSION=1.7
 # These will include the functions so we can call them from  here.
 ###############################################################################
 # utilities include making directories, downloading, patching etc
-source utilities.sh
+. ./utilities.sh
 
 # Options Parser, Usage, and Examples
-source options.sh
+. ./options.sh
 
 # how to configure/build each (Binutils, Gcc, Newlib, uClibc, & KOS)
-source build.sh
+. ./build.sh
 
 ###############################################################################
 # Our main function because I like C-like code

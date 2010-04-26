@@ -137,7 +137,7 @@ CreateDir()
 		QuietExec "mkdir -p $NEWLIBBUILD"
 	fi
 
-	if [ "$TARG" = "avr" -a ! -d $AVRLIBCBUILD ]; then
+	if [ "$TARG" = "avr" -a ! -d "$AVRLIBCBUILD" ]; then
 		QuietExec "mkdir -p $AVRLIBCBUILD"
 	fi
 }

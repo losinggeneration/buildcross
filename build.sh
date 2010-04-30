@@ -286,7 +286,7 @@ ConfigureKernelHeaders()
 			ExecuteCmd "make ARCH=$GENERICTARG CROSS_COMPILE=$TARG- INSTALL_HDR_PATH=$SYSROOT/usr headers_install"
 		fi
 	else
-		QuietExec "cd $BASEDIR/$TARG/$KERNEL"
+		QuietExec "cd $BASEDIR/$SYSTEM/$KERNEL"
 		if [ $(echo $KERNEL | grep libc) ]; then
 			ExecuteCmd "cp -r include/linux $HEADERSDIR"
 			#ExecuteCmd "cp -r include/asm-generic $HEADERSDIR/asm-generic"

@@ -90,7 +90,7 @@ ConfigureGcc()
 		ExecuteCmd "rm -fr $GCCBUILD/*"
 		QuietExec "cd $BASEDIR/$GCCBUILD"
 
-		if [ "$1" == "Initial" ]; then
+		if [ "$1" = "Initial" ]; then
 			local OPTS=$GCCBOPTS
 		else
 			OPTS=$GCCFOPTS
@@ -116,7 +116,7 @@ BuildGcc()
 	if ! CheckExists $GCCBUILD/.installed-$1; then
 		QuietExec "cd $BASEDIR/$GCCBUILD"
 
-		if [ "$1" == "Initial" ]; then
+		if [ "$1" = "Initial" ]; then
 			# Ok, Gcc 4.3 seems to change all-gcc's behavior. It's now split
 			# into all-gcc and all-target-libgcc. So now we have to check for
 			# newer versions.
@@ -179,7 +179,7 @@ BuildNewlib()
 
 		# SHELF is defined in Dreamcast.cfg
 		if [ "$SHELF" ]; then
-			if [ $THREADS == "posix" -o $THREADS == "yes" ]; then
+			if [ $THREADS = "posix" -o $THREADS = "yes" ]; then
 				# Make sure KOS is downloaded before trying to copy files from
 				# it
 				QuietExec "mkdir -p $KOSLOCATION"
@@ -373,7 +373,7 @@ ConfigureGlibc()
 
 	if ! CheckExists $GLIBCDIR/.configure-$1; then
 		QuietExec "cd $BASEDIR/$GCLIBCDIR"
-		if [ "$1" == "Headers" ]; then
+		if [ "$1" = "Headers" ]; then
 			# Prepare the linux headers
 			ConfigureKernelHeaders
 
@@ -432,7 +432,7 @@ BuildGlibc()
 	if ! CheckExists $GLIBCDIR/.installed-$1; then
 		QuietExec "cd $BASEDIR/$GLIBCDIR"
 
-		if [ "$1" == "Initial" ]; then
+		if [ "$1" = "Initial" ]; then
 			ExecuteCmd "$MAKE LD=$TARG-ld RANLIB=$TARG-ranlib lib"
 			# install-lib-all is defined in patched version of the Makefile only
 			ExecuteCmd "$MAKE install_root=$SYSROOT install-lib-all install-headers"
@@ -475,7 +475,7 @@ BuildKos()
 	Result "sed -e \"$KOSBASELINE c export KOS_BASE=\"$KOSLOCATION\"\" -i environ.sh"
 	LogOutput "Changed KOS_BASE with $KOSLOCATION"
 
-	if [ "$TARG" == "$SHELF" -o "$TARG" == "$ARMELF" ]; then
+	if [ "$TARG" = "$SHELF" -o "$TARG" = "$ARMELF" ]; then
 		# Same as above for DC_ARM_BASE, but we use where the compiler is
 		# installed instead
 		ARMBASELINE=$(grep -n "^export DC_ARM_BASE\=" environ.sh | cut -f1 -d:)

@@ -188,7 +188,7 @@ GccUntar()
 ###############################################################################
 Untar()
 {
-	if [ "$1" == "gcc" ]; then
+	if [ "$1" = "gcc" ]; then
 		lver="$3-$2"
 	else
 		lver="$2"
@@ -301,16 +301,16 @@ Download()
 ###############################################################################
 Patch()
 {
-	if [ $1 == "kos" ]; then
+	if [ $1 = "kos" ]; then
 		LOC=$KOSLOCATION
-	elif [ $1 == "kos-ports" ]; then
+	elif [ $1 = "kos-ports" ]; then
 		LOC=$KOSLOCATION/../kos-ports
 	else
 		LOC=$BASEDIR/$SYSTEM/$1-$2
 	fi
 
 	# We need to get past the name/version so shift the params two or three
-	if [ "$1" == "gcc" ]; then
+	if [ "$1" = "gcc" ]; then
 		shift 3
 	else
 		shift 2

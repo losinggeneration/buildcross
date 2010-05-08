@@ -1,7 +1,7 @@
 #!/bin/sh
 ###############################################################################
-# Copyright 2000-2007
-#         Harley Laue (losinggeneration@yahoo.com) and others (as noted).
+# Copyright 2000-2010
+#         Harley Laue (losinggeneration@gmail.com) and others (as noted).
 #         All rights reserved.
 ###############################################################################
 # Used for checking things in the code. Used with silent most the time so it's

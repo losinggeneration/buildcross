@@ -1,4 +1,3 @@
-#!/bin/sh
 ###############################################################################
 # Copyright 2000-2010
 #         Harley Laue (losinggeneration@gmail.com) and others (as noted).
@@ -153,20 +152,20 @@ SetOptions()
 	KERNEL="$KERNELNAME-$KERNELVER"
 
 	# Binutils patches
-	BINPATCH=$(ls $PATCHDIR/$BINUTILS-* 2> /dev/null)
+	BINPATCH=$PATCHDIR/$BINUTILS-*
 	# Gcc patches
-	GCCPATCH=$(ls $PATCHDIR/$GCC-* 2> /dev/null)
+	GCCPATCH=$PATCHDIR/$GCC-*
 	# Newlib patches
-	NEWLIBPATCH=$(ls $PATCHDIR/$NEWLIB-* 2> /dev/null)
+	NEWLIBPATCH=$PATCHDIR/$NEWLIB-*
 	# Kos patches
-	KOSPATCH=$(ls $PATCHDIR/kos-* 2> /dev/null)
+	KOSPATCH=$PATCHDIR/kos-*
 	# Kos-Ports patches
-	KOSPORTSPATCH=$(ls $PATCHDIR/kos-ports-* 2> /dev/null)
+	KOSPORTSPATCH=$PATCHDIR/kos-ports-*
 	# Glibc patches
-	GLIBCPATCH=$(ls $PATCHDIR/$GLIBC-* 2> /dev/null)
+	GLIBCPATCH=$PATCHDIR/$GLIBC-*
 	# uClibc patches
-	UCLIBCPATCH=$(ls $PATCHDIR/$UCLIBC-* 2> /dev/null)
-	AVRLIBCPATCH=$(ls $PATCHDIR/$AVRLIBC-* 2> /dev/null)
+	UCLIBCPATCH=$PATCHDIR/$UCLIBC-*
+	AVRLIBCPATCH=$PATCHDIR/$AVRLIBC-*
 
 	# Now we can setup everything else by the variables defined above
 	#################################################################
@@ -202,7 +201,7 @@ SetOptions()
 
 	# If the install directory doesn't exist make it
 	if [ ! -d "$INSTALL" ]; then
-		QuietExec "mkdir -p $INSTALL"
+		QuietExec mkdir -p $INSTALL
 	fi
 
 	# if HOSTPRE and TARG are the same you're bound to hit some program
@@ -635,6 +634,10 @@ ParseArgs()
 			;;
 		"avr")
 			SetOptions Avr
+			return 0
+			;;
+		"arm-meego")
+			SetOptions ArmMeego
 			return 0
 			;;
 		"-distclean")

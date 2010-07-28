@@ -1,4 +1,3 @@
-#!/bin/sh
 ###############################################################################
 # Copyright 2000-2010
 #         Harley Laue (losinggeneration@gmail.com) and others (as noted).
@@ -75,9 +74,12 @@ ConfigureGcc()
 			"c")
 				langs="core" ;;
 			"fortran")
-				langs="g77" ;;
+				# it's fortran for gcc >= 4.0 and g77 for < 4.0
+				[ `echo $GCCVER | cut -d"." -f1` -lt 4 ] && langs="g77" ;;
 			"c++")
 				langs="g++" ;;
+			"obj-c++")
+				langs="objc" ;;
 		esac
 
 		GccUntar $GCCVER $langs
@@ -90,10 +92,10 @@ ConfigureGcc()
 		ExecuteCmd "rm -fr $GCCBUILD/*"
 		QuietExec "cd $BASEDIR/$GCCBUILD"
 
-		if [ "$1" == "Initial" ]; then
-			local OPTS=$GCCBOPTS
+		if [ "$1" = "Initial" ]; then
+			local OPTS="$GCCBOPTS"
 		else
-			OPTS=$GCCFOPTS
+			local OPTS="$GCCFOPTS"
 		fi
 
 		ExecuteCmd "../$GCC/configure $OPTS" "Configuring $1 Gcc"
@@ -116,7 +118,7 @@ BuildGcc()
 	if ! CheckExists $GCCBUILD/.installed-$1; then
 		QuietExec "cd $BASEDIR/$GCCBUILD"
 
-		if [ "$1" == "Initial" ]; then
+		if [ "$1" = "Initial" ]; then
 			# Ok, Gcc 4.3 seems to change all-gcc's behavior. It's now split
 			# into all-gcc and all-target-libgcc. So now we have to check for
 			# newer versions.
@@ -373,7 +375,7 @@ ConfigureGlibc()
 
 	if ! CheckExists $GLIBCDIR/.configure-$1; then
 		QuietExec "cd $BASEDIR/$GCLIBCDIR"
-		if [ "$1" == "Headers" ]; then
+		if [ "$1" = "Headers" ]; then
 			# Prepare the linux headers
 			ConfigureKernelHeaders
 
@@ -432,7 +434,7 @@ BuildGlibc()
 	if ! CheckExists $GLIBCDIR/.installed-$1; then
 		QuietExec "cd $BASEDIR/$GLIBCDIR"
 
-		if [ "$1" == "Initial" ]; then
+		if [ "$1" = "Initial" ]; then
 			ExecuteCmd "$MAKE LD=$TARG-ld RANLIB=$TARG-ranlib lib"
 			# install-lib-all is defined in patched version of the Makefile only
 			ExecuteCmd "$MAKE install_root=$SYSROOT install-lib-all install-headers"
@@ -475,7 +477,7 @@ BuildKos()
 	Result "sed -e \"$KOSBASELINE c export KOS_BASE=\"$KOSLOCATION\"\" -i environ.sh"
 	LogOutput "Changed KOS_BASE with $KOSLOCATION"
 
-	if [ "$TARG" == "$SHELF" -o "$TARG" == "$ARMELF" ]; then
+	if [ "$TARG" = "$SHELF" -o "$TARG" = "$ARMELF" ]; then
 		# Same as above for DC_ARM_BASE, but we use where the compiler is
 		# installed instead
 		ARMBASELINE=$(grep -n "^export DC_ARM_BASE\=" environ.sh | cut -f1 -d:)

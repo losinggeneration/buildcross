@@ -78,6 +78,9 @@ if [ ! "$TWOPASS" ]; then
 	TWOPASS=0
 fi
 
+# Default to uClibc
+USEUCLIBC=yes
+
 # This can cause problems if set, so unset it for this script
 unset C_INCLUDE_PATH
 
@@ -547,6 +550,10 @@ ParseArgs()
 			;;
 		"-u")
 			USEUCLIBC=yes
+			return 0
+			;;
+		"-g")
+			unset USEUCLIBC
 			return 0
 			;;
 		"-native")

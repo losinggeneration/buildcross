@@ -647,20 +647,29 @@ DependsResult()
 ###############################################################################
 TestAll()
 {
-	QuietExec "cd $BASEDIR"
-	SetOptions Dreamcast
-	BuildDreamcast
+	USEUCLIBC=yes
 	QuietExec "cd $BASEDIR"
 	SetOptions Gamecube
 	All
 	BuildLinux DcLinux
 	QuietExec "cd $BASEDIR"
-#	SetOptions Genesis
-#	All
+	BuildLinux Didj
+	SetOptions Genesis
+	All
 	BuildLinux GcLinux
 	QuietExec "cd $BASEDIR"
 	SetOptions Ix86
 	All
+	QuietExec "cd $BASEDIR"
+	SetOptions Gba
+	All
+	SetOptions Saturn
+	All
+	SetOptions Avr
+	SinglePass
+	QuietExec "cd $BASEDIR"
+	SetOptions Dreamcast
+	BuildDreamcast
 }
 
 Package()

@@ -203,3 +203,9 @@ Version 1.8:
 	-Added a Gba and Arm Linux target (experimental)
 	-Version bumps to SFFL
 	-Updated support for uClibc (old versions will be broke)
+	-Added Didj target
+	-Better support for other shells besides bash compatibles
+	-AVR support (experimental)
+	-Glibc is unsupported in this release (it will probably be brought back as
+	 eGlibc in the future (probably 1.8.1)
+	-Because of above, uClibc is the default.

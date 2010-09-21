@@ -1,6 +1,6 @@
-diff -ruN gcc-4.4.0/gcc/config/sh/crt1.asm gcc-4.4.0-kos/gcc/config/sh/crt1.asm
---- gcc-4.4.0/gcc/config/sh/crt1.asm	2009-04-09 19:23:07.000000000 -0400
-+++ gcc-4.4.0-kos/gcc/config/sh/crt1.asm	2009-01-21 18:21:02.000000000 -0500
+diff -ruN gcc-4.4.4/gcc/config/sh/crt1.asm gcc-4.4.4-kos/gcc/config/sh/crt1.asm
+--- gcc-4.4.4/gcc/config/sh/crt1.asm	2009-04-09 19:23:07.000000000 -0400
++++ gcc-4.4.4-kos/gcc/config/sh/crt1.asm	2010-06-13 16:21:39.000000000 -0400
 @@ -1,1369 +1,197 @@
 -/* Copyright (C) 2000, 2001, 2003, 2004, 2005, 2006, 2009
 -   Free Software Foundation, Inc.
@@ -1549,9 +1549,9 @@ diff -ruN gcc-4.4.0/gcc/config/sh/crt1.asm gcc-4.4.0-kos/gcc/config/sh/crt1.asm
 +	.word	0x090d
 +ccr_data_ocram:
 +	.word	0x092d
-diff -ruN gcc-4.4.0/gcc/configure gcc-4.4.0-kos/gcc/configure
---- gcc-4.4.0/gcc/configure	2009-03-24 13:46:03.000000000 -0400
-+++ gcc-4.4.0-kos/gcc/configure	2009-04-30 10:14:02.000000000 -0400
+diff -ruN gcc-4.4.4/gcc/configure gcc-4.4.4-kos/gcc/configure
+--- gcc-4.4.4/gcc/configure	2009-10-19 08:15:27.000000000 -0400
++++ gcc-4.4.4-kos/gcc/configure	2010-06-14 09:59:17.000000000 -0400
 @@ -13334,7 +13334,7 @@
      target_thread_file='single'
      ;;
@@ -1561,11 +1561,11 @@ diff -ruN gcc-4.4.0/gcc/configure gcc-4.4.0-kos/gcc/configure
      target_thread_file=${enable_threads}
      ;;
    *)
-diff -ruN gcc-4.4.0/gcc/gthr-kos.h gcc-4.4.0-kos/gcc/gthr-kos.h
---- gcc-4.4.0/gcc/gthr-kos.h	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-4.4.0-kos/gcc/gthr-kos.h	2009-04-30 13:41:19.000000000 -0400
-@@ -0,0 +1,291 @@
-+/* Copyright (C) 2009 Lawrence Sebald */
+diff -ruN gcc-4.4.4/gcc/gthr-kos.h gcc-4.4.4-kos/gcc/gthr-kos.h
+--- gcc-4.4.4/gcc/gthr-kos.h	1969-12-31 19:00:00.000000000 -0500
++++ gcc-4.4.4-kos/gcc/gthr-kos.h	2010-06-13 19:33:38.000000000 -0400
+@@ -0,0 +1,391 @@
++/* Copyright (C) 2009, 2010 Lawrence Sebald */
 +
 +/* Threads compatibility routines for libgcc2 and libobjc.  */
 +/* Compile this one with gcc.  */
@@ -1599,6 +1599,8 @@ diff -ruN gcc-4.4.0/gcc/gthr-kos.h gcc-4.4.0-kos/gcc/gthr-kos.h
 +/* KallistiOS threads specific definitions. */
 +
 +#define __GTHREADS 1
++#define __GTHREADS_CXX0X 1
++#define __GTHREAD_HAS_COND 1
 +
 +#include <assert.h>
 +#include <kos/thread.h>
@@ -1607,12 +1609,16 @@ diff -ruN gcc-4.4.0/gcc/gthr-kos.h gcc-4.4.0-kos/gcc/gthr-kos.h
 +#include <kos/recursive_lock.h>
 +#include <kos/once.h>
 +#include <kos/cond.h>
++#include <time.h>
 +
 +/* These should work just fine. */
 +typedef kthread_key_t __gthread_key_t;
 +typedef kthread_once_t __gthread_once_t;
 +typedef mutex_t * __gthread_mutex_t;
 +typedef recursive_lock_t * __gthread_recursive_mutex_t;
++typedef condvar_t * __gthread_cond_t;
++typedef kthread_t * __gthread_t;
++typedef struct timespec __gthread_time_t;
 +
 +static void __gthr_mutex_init(__gthread_mutex_t *__mutex) {
 +    assert(__mutex);
@@ -1624,9 +1630,15 @@ diff -ruN gcc-4.4.0/gcc/gthr-kos.h gcc-4.4.0-kos/gcc/gthr-kos.h
 +    *__mutex = rlock_create();
 +}
 +
++static void __gthr_cond_init(__gthread_cond_t *__cond) {
++    assert(__cond);
++    *__cond = cond_create();
++}
++
 +#define __GTHREAD_ONCE_INIT KTHREAD_ONCE_INIT
 +#define __GTHREAD_MUTEX_INIT_FUNCTION __gthr_mutex_init
 +#define __GTHREAD_RECURSIVE_MUTEX_INIT_FUNCTION __gthr_recursive_mutex_init
++#define __GTHREAD_COND_INIT_FUNCTION __gthr_cond_init
 +
 +static inline int __gthread_active_p(void) {
 +  return 1;
@@ -1851,6 +1863,94 @@ diff -ruN gcc-4.4.0/gcc/gthr-kos.h gcc-4.4.0-kos/gcc/gthr-kos.h
 +static inline int __gthread_recursive_mutex_unlock(__gthread_recursive_mutex_t *__mutex) {
 +    assert(__mutex);
 +    return rlock_unlock(*__mutex);
++}
++
++static inline int __gthread_cond_broadcast(__gthread_cond_t *cond) {
++    assert(cond);
++    cond_broadcast(*cond);
++    return 0;
++}
++
++static inline int __gthread_cond_wait(__gthread_cond_t *cond, __gthread_mutex_t *mutex) {
++    assert(cond);
++    return cond_wait(*cond, *mutex);
++}
++
++static inline int __gthread_cond_wait_recursive(__gthread_cond_t *cond,
++                                                __gthread_recursive_mutex_t *mutex) {
++    assert(cond);
++    return cond_wait_recursive(*cond, *mutex);
++}
++
++/* C++0x support functions */
++
++static inline int __gthread_create(__gthread_t *thd, void *(*func)(void *),
++                                   void *args) {
++    assert(thd);
++    *thd = thd_create((void (*)(void*))func, args);
++    return (*thd == NULL);
++}
++
++static inline int __gthread_join(__gthread_t thd, void **value_ptr) {
++    /* XXXX: KOS has no return values from threads! */
++    assert(thd);
++    (void)value_ptr;
++    return thd_wait(thd);
++}
++
++static inline int __gthread_detach(__gthread_t thd) {
++    /* XXXX */
++    (void)thd;
++    return 0;
++}
++
++static inline int __gthread_equal(__gthread_t t1, __gthread_t t2) {
++    return t1 == t2;
++}
++
++static inline __gthread_t __gthread_self(void) {
++    return thd_get_current();
++}
++
++static inline int __gthread_yield(void) {
++    thd_pass();
++    return 0;
++}
++
++static inline int __gthread_mutex_timedlock(__gthread_mutex_t *m,
++                                            const __gthread_time_t *timeout) {
++    int t = (int)(timeout->tv_sec + (timeout->tv_nsec / 1000));
++    assert(m);
++    return mutex_lock_timed(*m, t);
++}
++
++static inline int __gthread_recursive_mutex_timedlock(__gthread_recursive_mutex_t *l,
++                                                      const __gthread_time_t *timeout) {
++    int t = (int)(timeout->tv_sec + (timeout->tv_nsec / 1000));
++    assert(l);
++    return rlock_lock_timed(*l, t);
++}
++
++static inline int __gthread_cond_signal(__gthread_cond_t *cond) {
++    assert(cond);
++    cond_signal(*cond);
++    return 0;
++}
++
++static inline int __gthread_cond_timedwait(__gthread_cond_t *cond,
++                                           __gthread_mutex_t *mutex,
++                                           const __gthread_time_t *timeout) {
++    int t = (int)(timeout->tv_sec + (timeout->tv_nsec / 1000));
++    assert(cond);
++    return cond_wait_timed(*cond, *mutex, t);
++}
++
++static inline int __gthread_cond_timedwait_recursive(__gthread_cond_t *cond,
++                                                     __gthread_recursive_mutex_t *l,
++                                                     const __gthread_time_t *timeout) {
++    int t = (int)(timeout->tv_sec + (timeout->tv_nsec / 1000));
++    assert(cond);
++    return cond_wait_timed_recursive(*cond, *l, t);
 +}
 +
 +#endif /* _LIBOBJC */

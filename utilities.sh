@@ -1,15 +1,59 @@
-#!/bin/sh
 ###############################################################################
 # Copyright 2000-2010
 #         Harley Laue (losinggeneration@gmail.com) and others (as noted).
 #         All rights reserved.
+###############################################################################
+# Bash's echo requires -e while dash, zsh, and /bin/echo don't seem to.
+# So we'll override it and play it safe if there's no /bin/echo
+# Dash's builtin echo doesn't have a -e command, so we remove it. On systems
+# that use Bash and don't have /bin/echo it's going to be pretty ugly. In that
+# case it'd be best for the user to use -s with buildcross to avoid this issue
+###############################################################################
+check_echo()
+{
+	# check if echo supports -e
+	if [ "`echo -e`" = "-e" ]; then
+		# if not, see if /bin/echo is there, it might
+		if [ -x /bin/echo ]; then
+			ECHO="/bin/echo"
+		else
+			ECHO="echo"
+		fi
+	else
+		ECHO="echo"
+	fi
+
+	# if we don't have -e, remove colors to play it safe
+	if [ "`$ECHO -e`" = "-e" ]; then
+		RemoveColorize
+	else
+		Colorize
+	fi
+}
+
+buildcross_echo()
+{
+	if [ "$TEXTPREFIX" ]; then
+		$ECHO $*
+	else
+		# this may be a bit too much overhead. Perhaps if it's colorized we
+		# should just check before sending -e here...
+		for i in $*; do
+			if [ "$i" != "-e" ]; then
+				local ECHO_OPTS="$ECHO_OPTS $i"
+			fi
+		done
+		$ECHO $ECHO_OPTS
+	fi
+}
+
 ###############################################################################
 # Used for checking things in the code. Used with silent most the time so it's
 # easy to see debug messages.
 ###############################################################################
 Debug()
 {
-	echo -e "${TEXTPREFIX}debug:: $TEXTDEBUG$*$TEXTRESET"
+	buildcross_echo -e "${TEXTPREFIX}debug:: $TEXTDEBUG$*$TEXTRESET"
 }
 
 ###############################################################################
@@ -52,9 +96,9 @@ ExecuteCmd()
 QuietExec()
 {
 	if [ "$SILENT" -eq 0 ]; then
-		$1
+		$*
 	else
-		$1 >> $SENDTOWHERE 2>> $ERRORTOWHERE
+		$* >> $SENDTOWHERE 2>> $ERRORTOWHERE
 	fi
 
 	if [ $? -ne 0 ]; then
@@ -82,9 +126,9 @@ Result()
 ###############################################################################
 LogTitle()
 {
-	echo -e "$TEXTPREFIX## $TEXTTITLE$*$TEXTRESET"
+	buildcross_echo -e "$TEXTPREFIX## $TEXTTITLE$*$TEXTRESET"
 	if [ "$SILENT" -ne 0 ]; then
-		echo "## $*" >> $SENDTOWHERE
+		buildcross_echo "## $*" >> $SENDTOWHERE
 	fi
 }
 
@@ -94,9 +138,9 @@ LogTitle()
 LogOutput()
 {
 	if [ "$SILENT" -eq 0 ]; then
-		echo -e "$TEXTPREFIX:: $TEXTOUTPUT$*$TEXTRESET"
+		buildcross_echo -e "$TEXTPREFIX:: $TEXTOUTPUT$*$TEXTRESET"
 	else
-		echo ":: $*" >> $SENDTOWHERE
+		buildcross_echo ":: $*" >> $SENDTOWHERE
 	fi
 }
 
@@ -105,9 +149,9 @@ LogOutput()
 ###############################################################################
 LogError()
 {
-	echo -e "$TEXTPREFIX!! $TEXTERROR$*$TEXTRESET"
+	buildcross_echo -e "$TEXTPREFIX!! $TEXTERROR$*$TEXTRESET"
 	if [ "$SILENT" -ne 0 ]; then
-		echo "!! $*" >> $ERRORTOWHERE
+		buildcross_echo "!! $*" >> $ERRORTOWHERE
 	fi
 }
 
@@ -126,19 +170,19 @@ LogFatal()
 CreateDir()
 {
 	if [ ! -d "$BINBUILD" ]; then
-		QuietExec "mkdir -p $BINBUILD"
+		QuietExec mkdir -p $BINBUILD
 	fi
 
 	if [ ! -d "$GCCBUILD" ]; then
-		QuietExec "mkdir -p $GCCBUILD"
+		QuietExec mkdir -p $GCCBUILD
 	fi
 
 	if [ ! -d "$NEWLIBBUILD" ]; then
-		QuietExec "mkdir -p $NEWLIBBUILD"
+		QuietExec mkdir -p $NEWLIBBUILD
 	fi
 
-	if [ "$TARG" = "avr" -a ! -d "$AVRLIBCBUILD" ]; then
-		QuietExec "mkdir -p $AVRLIBCBUILD"
+	if [ "$TARG" = "avr" -a ! -d $AVRLIBCBUILD ]; then
+		QuietExec mkdir -p $AVRLIBCBUILD
 	fi
 }
 
@@ -607,20 +651,29 @@ DependsResult()
 ###############################################################################
 TestAll()
 {
-	QuietExec "cd $BASEDIR"
-	SetOptions Dreamcast
-	BuildDreamcast
+	USEUCLIBC=yes
 	QuietExec "cd $BASEDIR"
 	SetOptions Gamecube
 	All
 	BuildLinux DcLinux
 	QuietExec "cd $BASEDIR"
-#	SetOptions Genesis
-#	All
+	BuildLinux Didj
+	SetOptions Genesis
+	All
 	BuildLinux GcLinux
 	QuietExec "cd $BASEDIR"
 	SetOptions Ix86
 	All
+	QuietExec "cd $BASEDIR"
+	SetOptions Gba
+	All
+	SetOptions Saturn
+	All
+	SetOptions Avr
+	SinglePass
+	QuietExec "cd $BASEDIR"
+	SetOptions Dreamcast
+	BuildDreamcast
 }
 
 Package()

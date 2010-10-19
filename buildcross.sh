@@ -4,6 +4,9 @@
 #         Harley Laue (losinggeneration@gmail.com) and others (as noted).
 #         All rights reserved.
 ###############################################################################
+# If you want to use #!/bin/zsh, you must add -y onto the end as this script
+# requires that functionality. -y is as of this writting --shwordsplit
+###############################################################################
 # Most UNIX based systems should have most all of this.
 # Depends on bash, sed, mv, cp, ln, pwd, rm, mkdir, grep, touch, and of course
 # a working development system (gcc, binutils, make, texinfo, etc)
@@ -37,8 +40,8 @@ BUILDCROSS_VERSION=1.7
 ###############################################################################
 main()
 {
-	# Turn on colors by default
-	Colorize
+	# check if colors can be on by default
+	check_echo
 	# Set up some things the user wont ever need to
 	# Default to $SYSTEM options
 	#SetOptions $SYSTEM

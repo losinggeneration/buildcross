@@ -1,24 +1,25 @@
-diff -Nbaur gcc-4.4.2/gcc/config/rs6000/rs6000.h gcc-4.4.2-ppc/gcc/config/rs6000/rs6000.h
---- gcc-4.4.2/gcc/config/rs6000/rs6000.h	2009-04-10 00:23:07.000000000 +0100
-+++ gcc-4.4.2-ppc/gcc/config/rs6000/rs6000.h	2009-10-20 09:10:22.000000000 +0100
-@@ -180,12 +180,12 @@
+diff -Nbaur gcc-4.4.4/gcc/config/rs6000/rs6000.h gcc-4.4.4-ppc/gcc/config/rs6000/rs6000.h
+--- gcc-4.4.4/gcc/config/rs6000/rs6000.h	2009-04-10 00:23:07.000000000 +0100
++++ gcc-4.4.4-ppc/gcc/config/rs6000/rs6000.h	2010-07-01 01:34:08.000000000 +0100
+@@ -175,6 +175,7 @@
+   { "asm_cpu_power7",		ASM_CPU_POWER7_SPEC },			\
+   SUBTARGET_EXTRA_SPECS
+ 
++#if 0
+ /* -mcpu=native handling only makes sense with compiler running on
+    an PowerPC chip.  If changing this condition, also change
     the condition in driver-rs6000.c.  */
- #if defined(__powerpc__) || defined(__POWERPC__) || defined(_AIX)
- /* In driver-rs6000.c.  */
--extern const char *host_detect_local_cpu (int argc, const char **argv);
-+/*extern const char *host_detect_local_cpu (int argc, const char **argv);
- #define EXTRA_SPEC_FUNCTIONS \
+@@ -185,6 +186,7 @@
    { "local_cpu_detect", host_detect_local_cpu },
  #define HAVE_LOCAL_CPU_DETECT
-+*/
  #endif
--
++#endif 
+ 
  #ifndef CC1_CPU_SPEC
  #ifdef HAVE_LOCAL_CPU_DETECT
- #define CC1_CPU_SPEC \
-diff -Nbaur gcc-4.4.2/gcc/config/rs6000/sysv4.h gcc-4.4.2-ppc/gcc/config/rs6000/sysv4.h
---- gcc-4.4.2/gcc/config/rs6000/sysv4.h	2009-04-10 00:23:07.000000000 +0100
-+++ gcc-4.4.2-ppc/gcc/config/rs6000/sysv4.h	2009-10-20 09:10:22.000000000 +0100
+diff -Nbaur gcc-4.4.4/gcc/config/rs6000/sysv4.h gcc-4.4.4-ppc/gcc/config/rs6000/sysv4.h
+--- gcc-4.4.4/gcc/config/rs6000/sysv4.h	2009-04-10 00:23:07.000000000 +0100
++++ gcc-4.4.4-ppc/gcc/config/rs6000/sysv4.h	2010-07-01 01:30:17.000000000 +0100
 @@ -664,7 +664,11 @@
  
  /* Default starting address if specified.  */
@@ -174,9 +175,9 @@ diff -Nbaur gcc-4.4.2/gcc/config/rs6000/sysv4.h gcc-4.4.2-ppc/gcc/config/rs6000/
    { "cpp_os_ads",		CPP_OS_ADS_SPEC },			\
    { "cpp_os_yellowknife",	CPP_OS_YELLOWKNIFE_SPEC },		\
    { "cpp_os_mvme",		CPP_OS_MVME_SPEC },			\
-diff -Nbaur gcc-4.4.2/gcc/config/rs6000/sysv4.opt gcc-4.4.2-ppc/gcc/config/rs6000/sysv4.opt
---- gcc-4.4.2/gcc/config/rs6000/sysv4.opt	2009-02-20 15:20:38.000000000 +0000
-+++ gcc-4.4.2-ppc/gcc/config/rs6000/sysv4.opt	2009-10-20 09:10:22.000000000 +0100
+diff -Nbaur gcc-4.4.4/gcc/config/rs6000/sysv4.opt gcc-4.4.4-ppc/gcc/config/rs6000/sysv4.opt
+--- gcc-4.4.4/gcc/config/rs6000/sysv4.opt	2009-02-20 15:20:38.000000000 +0000
++++ gcc-4.4.4-ppc/gcc/config/rs6000/sysv4.opt	2010-07-01 01:30:17.000000000 +0100
 @@ -107,6 +107,26 @@
  Target RejectNegative
  Link with libads.a, libc.a and crt0.o
@@ -204,101 +205,9 @@ diff -Nbaur gcc-4.4.2/gcc/config/rs6000/sysv4.opt gcc-4.4.2-ppc/gcc/config/rs600
  myellowknife
  Target RejectNegative
  Link with libyk.a, libc.a and crt0.o
-diff -Nbaur gcc-4.4.2/gcc/gcc.c gcc-4.4.2-ppc/gcc/gcc.c
---- gcc-4.4.2/gcc/gcc.c	2009-03-17 21:25:59.000000000 +0000
-+++ gcc-4.4.2-ppc/gcc/gcc.c	2009-10-20 09:10:23.000000000 +0100
-@@ -698,7 +698,7 @@
-    -lgcc and -lc order specially, yet not require them to override all
-    of LINK_COMMAND_SPEC.  */
- #ifndef LINK_GCC_C_SEQUENCE_SPEC
--#define LINK_GCC_C_SEQUENCE_SPEC "%G %L %G"
-+#define LINK_GCC_C_SEQUENCE_SPEC "%G %L %G -lm"
- #endif
- 
- #ifndef LINK_SSP_SPEC
-@@ -3455,8 +3455,6 @@
-       gcc_libexec_prefix = make_relative_prefix (argv[0],
- 						 standard_bindir_prefix,
- 						 standard_libexec_prefix);
--      if (gcc_exec_prefix)
--	xputenv (concat ("GCC_EXEC_PREFIX=", gcc_exec_prefix, NULL));
-     }
-   else
-     {
-@@ -6361,10 +6359,18 @@
- 
-   /* We need to check standard_exec_prefix/just_machine_suffix/specs
-      for any override of as, ld and libraries.  */
--  specs_file = (char *) alloca (strlen (standard_exec_prefix)
-+   if ( gcc_exec_prefix )
-+   {
-+     specs_file = alloca (strlen (gcc_exec_prefix)
- 		       + strlen (just_machine_suffix) + sizeof ("specs"));
- 
-+     strcpy (specs_file, gcc_exec_prefix);
-+   } else {
-+
-+    specs_file = (char *) alloca (strlen (standard_exec_prefix)
-+		       + strlen (just_machine_suffix) + sizeof ("specs"));
-   strcpy (specs_file, standard_exec_prefix);
-+  }
-   strcat (specs_file, just_machine_suffix);
-   strcat (specs_file, "specs");
-   if (access (specs_file, R_OK) == 0)
-diff -Nbaur gcc-4.4.2/gcc/prefix.c gcc-4.4.2-ppc/gcc/prefix.c
---- gcc-4.4.2/gcc/prefix.c	2007-09-03 18:09:20.000000000 +0100
-+++ gcc-4.4.2-ppc/gcc/prefix.c	2009-10-20 09:10:23.000000000 +0100
-@@ -245,13 +245,16 @@
-    The returned string is always malloc-ed, and the caller is
-    responsible for freeing it.  */
- 
-+
-+static const char *old_prefix = PREFIX;
-+
- char *
- update_path (const char *path, const char *key)
- {
-   char *result, *p;
--  const int len = strlen (std_prefix);
-+  const int len = strlen (old_prefix);
- 
--  if (! strncmp (path, std_prefix, len)
-+  if (! strncmp (path, old_prefix, len)
-       && (IS_DIR_SEPARATOR(path[len])
-           || path[len] == '\0')
-       && key != 0)
-@@ -353,4 +356,6 @@
- set_std_prefix (const char *prefix, int len)
- {
-   std_prefix = save_string (prefix, len);
-+
-+	putenv (concat ("GCC_EXEC_PREFIX=", std_prefix, NULL));
- }
-diff -Nbaur gcc-4.4.2/gcc/toplev.c gcc-4.4.2-ppc/gcc/toplev.c
---- gcc-4.4.2/gcc/toplev.c	2009-04-29 05:57:17.000000000 +0100
-+++ gcc-4.4.2-ppc/gcc/toplev.c	2009-10-20 09:10:23.000000000 +0100
-@@ -84,6 +84,7 @@
- #include "tree-mudflap.h"
- #include "tree-pass.h"
- #include "gimple.h"
-+#include "prefix.h"
- 
- #if defined (DWARF2_UNWIND_INFO) || defined (DWARF2_DEBUGGING_INFO)
- #include "dwarf2out.h"
-@@ -1557,6 +1558,10 @@
- 
-   xmalloc_set_program_name (progname);
- 
-+  p = getenv("GCC_EXEC_PREFIX");
-+  if (p && strlen(p)) set_std_prefix (p, strlen(p));
-+
-+
-   hex_init ();
- 
-   /* Unlock the stdio streams.  */
-diff -Nbaur gcc-4.4.2/libcpp/Makefile.in gcc-4.4.2-ppc/libcpp/Makefile.in
---- gcc-4.4.2/libcpp/Makefile.in	2009-10-15 08:55:16.000000000 +0100
-+++ gcc-4.4.2-ppc/libcpp/Makefile.in	2009-10-20 09:10:23.000000000 +0100
+diff -Nbaur gcc-4.4.4/libcpp/Makefile.in gcc-4.4.4-ppc/libcpp/Makefile.in
+--- gcc-4.4.4/libcpp/Makefile.in	2010-04-29 09:26:54.000000000 +0100
++++ gcc-4.4.4-ppc/libcpp/Makefile.in	2010-07-01 01:30:17.000000000 +0100
 @@ -201,8 +201,7 @@
  # Note that we put the dependencies into a .Tpo file, then move them
  # into place if the compile succeeds.  We need this because gcc does

@@ -1,4 +1,3 @@
-#!/bin/sh
 ###############################################################################
 # Copyright 2000-2010
 #         Harley Laue (losinggeneration@gmail.com) and others (as noted).
@@ -75,9 +74,12 @@ ConfigureGcc()
 			"c")
 				langs="core" ;;
 			"fortran")
-				langs="g77" ;;
+				# it's fortran for gcc >= 4.0 and g77 for < 4.0
+				[ `echo $GCCVER | cut -d"." -f1` -lt 4 ] && langs="g77" ;;
 			"c++")
 				langs="g++" ;;
+			"obj-c++")
+				langs="objc" ;;
 		esac
 
 		GccUntar $GCCVER $langs
@@ -91,9 +93,9 @@ ConfigureGcc()
 		QuietExec "cd $BASEDIR/$GCCBUILD"
 
 		if [ "$1" = "Initial" ]; then
-			local OPTS=$GCCBOPTS
+			local OPTS="$GCCBOPTS"
 		else
-			OPTS=$GCCFOPTS
+			local OPTS="$GCCFOPTS"
 		fi
 
 		ExecuteCmd "../$GCC/configure $OPTS" "Configuring $1 Gcc"
@@ -178,8 +180,8 @@ BuildNewlib()
 		ExecuteCmd "$MAKE install" "Building Newlib"
 
 		# SHELF is defined in Dreamcast.cfg
-		if [ "$SHELF" ]; then
-			if [ $THREADS = "posix" -o $THREADS = "yes" ]; then
+		if [ "$USEKOS" ]; then
+			if [ "$THREADS" = "posix" -o "$THREADS" = "yes" -o "$THREADS" = "kos" ]; then
 				# Make sure KOS is downloaded before trying to copy files from
 				# it
 				QuietExec "mkdir -p $KOSLOCATION"
@@ -204,9 +206,9 @@ BuildNewlib()
 				# so KOS includes are available as kos/file.h
 				ExecuteCmd "ln -nsf $KOSLOCATION/include/kos $INSTALL/$TARG/include"
 				# kos/thread.h requires arch/arch.h
-				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/arch $INSTALL/$TARG/include"
+				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/$SYSTEM/include/arch $INSTALL/$TARG/include"
 				# arch/arch.h requires dc/video.h
-				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/dreamcast/include/dc $INSTALL/$TARG/include"
+				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/$SYSTEM/include/$KOSSYSINC $INSTALL/$TARG/include"
 			fi
 		fi
 

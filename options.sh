@@ -627,6 +627,10 @@ ParseArgs()
 			SetOptions ArmLinux
 			return 0
 			;;
+		"freerunner")
+			SetOptions NeoFreerunner
+			return 0
+			;;
 		"didj")
 			SetOptions Didj
 			return 0

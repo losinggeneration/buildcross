@@ -209,3 +209,6 @@ Version 1.8:
 	-Glibc is unsupported in this release (it will probably be brought back as
 	 eGlibc in the future (probably 1.8.1)
 	-Because of above, uClibc is the default.
+	-Added Neo Freerunner target which is arm9tdmi
+	-Added devkitPro Gamecube/Wii ld files & rules
+	-Correctly check for fortran & obj-c++ if it's a selected language

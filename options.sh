@@ -651,6 +651,10 @@ ParseArgs()
 			SetOptions ArmMeego
 			return 0
 			;;
+		"rx")
+			SetOptions Rx
+			return 0
+			;;
 		"-distclean")
 			DistClean
 			return 0

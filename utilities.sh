@@ -170,20 +170,25 @@ LogFatal()
 CreateDir()
 {
 	if [ ! -d "$BINBUILD" ]; then
-		QuietExec mkdir -p $BINBUILD
+		QuietExec mkdir -p "$BINBUILD"
 	fi
 
 	if [ ! -d "$GCCBUILD" ]; then
-		QuietExec mkdir -p $GCCBUILD
+		QuietExec mkdir -p "$GCCBUILD"
 	fi
 
 	if [ ! -d "$NEWLIBBUILD" ]; then
-		QuietExec mkdir -p $NEWLIBBUILD
+		QuietExec mkdir -p "$NEWLIBBUILD"
 	fi
 
-	if [ "$TARG" = "avr" -a ! -d $AVRLIBCBUILD ]; then
-		QuietExec mkdir -p $AVRLIBCBUILD
+	if [ "$TARG" = "avr" -a ! -d "$AVRLIBCBUILD" ]; then
+		QuietExec mkdir -p "$AVRLIBCBUILD"
 	fi
+
+	if [ ! -d "$GDBBUILD" ]; then
+		QuietExec mkdir -p "$GDBBUILD"
+	fi
+
 }
 
 ###############################################################################
@@ -332,6 +337,12 @@ Download()
 			fi
 			QuietExec "cd $BASEDIR"
 			;;
+		"gdb")
+			if ! CheckExists .$GDB-downloaded || ! CheckExists $GDB.tar.bz2; then
+				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/gdb/$GDB.tar.bz2"
+				QuietExec "touch .$GDB-downloaded"
+			fi
+			;;
 		*)
 			LogFatal "Script problem, contact maintainer to fix ;-)"
 			;;
@@ -387,8 +398,10 @@ Patch()
 Remove()
 {
 	CheckSystem
-	LogOutput "Removing contents of $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*"
-	ExecuteCmd "rm -fr $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*" "Removing $1"
+	if [ -d "$BASEDIR/$1" ]; then
+		LogOutput "Removing contents of $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*"
+		ExecuteCmd "rm -fr $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*" "Removing $1"
+	fi
 }
 
 ###############################################################################
@@ -397,8 +410,10 @@ Remove()
 CleaningRemove()
 {
 	CheckSystem
-	LogTitle "Removing contents of $BASEDIR/$1/*"
-	ExecuteCmd "rm -fr $BASEDIR/$1/*" "Removing contents of $BASEDIR/$1/*"
+	if [ -d "$BASEDIR/$1" ]; then
+		LogTitle "Removing contents of $BASEDIR/$1/*"
+		ExecuteCmd "rm -fr $BASEDIR/$1/*" "Removing contents of $BASEDIR/$1/*"
+	fi
 }
 
 ###############################################################################
@@ -407,8 +422,10 @@ CleaningRemove()
 CleanInstall()
 {
 	CheckSystem
-	LogTitle "Cleaning $INSTALL"
-	ExecuteCmd "rm -fr $INSTALL/*" "Cleaning $INSTALL"
+	if [ -d "$INSTALL" ]; then
+		LogTitle "Cleaning $INSTALL"
+		ExecuteCmd "rm -fr $INSTALL/*" "Cleaning $INSTALL"
+	fi
 }
 
 ###############################################################################

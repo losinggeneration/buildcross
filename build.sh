@@ -550,6 +550,56 @@ BuildKos()
 }
 
 ###############################################################################
+# Configure Gdb
+###############################################################################
+ConfigureGdb()
+{
+	LogTitle "Configuring Gdb"
+	# Try to Untar and Patch Gdb if needed
+	UntarPatch gdb $GDBVER $GDBPATCH
+
+	# Check if we've already configured. If not, configure
+	if ! CheckExists $GDBBUILD/.configure; then
+		# Remove the contents of the build directory
+		Remove $GDBBUILD
+		# Go to the build directory
+		QuietExec "cd $BASEDIR/$GDBBUILD"
+
+		ExecuteCmd "../$GDB/configure $GDBOPTS" "Configuring Gdb"
+		QuietExec "touch .configure"
+	else
+		LogTitle "Gdb Already configured"
+	fi
+
+	# Go back to the base directory
+	cd $BASEDIR
+}
+
+###############################################################################
+# Build Gdb
+###############################################################################
+BuildGdb()
+{
+	LogTitle "Building Gdb"
+
+	# Check if we've installed Gdb already
+	if ! CheckExists $GDBBUILD/.installed; then
+		# Change to the build directory
+		QuietExec "cd $BASEDIR/$GDBBUILD"
+
+		ExecuteCmd "$MAKE all"
+		ExecuteCmd "$MAKE install" "Building Gdb"
+
+		QuietExec "touch .installed"
+	else
+		LogTitle "Gdb already installed"
+	fi
+
+	# Go back to the base directory
+	QuietExec "cd $BASEDIR"
+}
+
+###############################################################################
 # Do it all in a relatively sane manor ;)
 ###############################################################################
 All()

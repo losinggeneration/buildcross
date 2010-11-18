@@ -142,8 +142,12 @@ SetOptions()
 		UCLIBCDIR="$SYSTEM"
 	fi
 
-	if [ ! "$CLIBCHDIR" ]; then
-		CLIBCHDIR="$SYSTEM"
+	if [ ! "$GLIBCHDIR" ]; then
+		GLIBCHDIR="$SYSTEM"
+	fi
+
+	if [ ! "$GDBBUILD" ]; then
+		GDBBUILD="$SYSTEM"
 	fi
 
 	BINUTILS="binutils-$BINVER"
@@ -153,6 +157,7 @@ SetOptions()
 	GLIBC="glibc-$GLIBCVER"
 	UCLIBC="uClibc-$UCLIBCVER"
 	KERNEL="$KERNELNAME-$KERNELVER"
+	GDB="gdb-$GDBVER"
 
 	# Binutils patches
 	BINPATCH=$PATCHDIR/$BINUTILS-*
@@ -169,6 +174,7 @@ SetOptions()
 	# uClibc patches
 	UCLIBCPATCH=$PATCHDIR/$UCLIBC-*
 	AVRLIBCPATCH=$PATCHDIR/$AVRLIBC-*
+	GDBPATCH=$PATHCDIR/$GDB-*
 
 	# Now we can setup everything else by the variables defined above
 	#################################################################
@@ -196,11 +202,14 @@ SetOptions()
 	GLIBCHOPTS="$TARGET $HOST $BUILD --prefix=/usr $GLIBCHOPTS"
 	GLIBCFOPTS="--host=$TARG $TARGET $BUILD --prefix=/usr $GLIBCFOPTS"
 
+	GDBOPTS="$TARGET $HOST $PREFIX $GDBOPTS"
+
 	# Set up directory names
 	BINBUILD="$SYSTEM/binbuildelf"
 	GCCBUILD="$SYSTEM/gccbuildelf"
 	NEWLIBBUILD="$SYSTEM/newlibbuildelf"
 	AVRLIBCBUILD="$SYSTEM/avrlibcbuild"
+	GDBBUILD="$SYSTEM/gdbbuild"
 
 	# If the install directory doesn't exist make it
 	if [ ! -d "$INSTALL" ]; then
@@ -267,6 +276,10 @@ Usage()
 	LogOutput "	-c2g Configure Glibc after the initial Gcc is installed"
 	LogOutput "	-bg Build and Install initial Glibc after initial Gcc"
 	LogOutput "	-b2g Build and install Glibc before final Gcc is built"
+	LogOutput
+	LogOutput "	-cgdb Configure Gdb"
+	LogOutput "	-bgdb Build Gdb"
+	LogOutput "	-gdb Configure & Build Gdb"
 	LogOutput
 	LogOutput "	-s Build silently (needs /dev/null on system, and"
 	LogOutput "    should be called before all that you want silent"
@@ -522,6 +535,21 @@ ParseArgs()
 		"-b2g")
 			Remove $GLIBCDIR/.installed-Final
 			BuildGlibc "Final"
+			return 0
+			;;
+		"-cgdb")
+			Remove $GDBBUILD
+			ConfigureGdb
+			return 0
+			;;
+		"-bgdb")
+			Remove $GDBBUILD/.installed
+			BuildGdb
+			return 0
+			;;
+		"-gdb")
+			ConfigureGdb
+			BuildGdb
 			return 0
 			;;
 		"-dc")

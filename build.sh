@@ -549,6 +549,46 @@ BuildKos()
 	ExecuteCmd "$MAKE" "Building Kos ports"
 }
 
+ConfigureNuttX()
+{
+	LogTitle "Configuring NuttX"
+	UntarPatch nuttx $NUTTXVER $NUTTXPATCH
+
+	if ! CheckExists $NUTTXBUILD/.configure; then
+		QuietExec "cd $BASEDIR/$NUTTXDIR"
+		# Make sure we're building cleanly
+		ExecuteCmd "make distclean"
+
+		QuietExec "cd tools"
+		ExecuteCmd "./configure.sh $NUTTXBOARD/$NUTTXAPP"
+
+		# Now copy the headers to the compiler
+		QuietExec "cd .."
+		QuietExec "mkdir -p $INSTALL/$TARG"
+		ExecuteCmd "cp -r include $INSTALL/$TARG"
+
+		QuietExec "touch .configure"
+	else
+		LogTitle "NuttX already configured"
+	fi
+
+	cd $BASEDIR
+}
+
+BuildNuttX()
+{
+	LogTitle "Building NuttX"
+
+	# Change to the build directory
+	QuietExec "cd $BASEDIR/$NUTTXDIR"
+
+	ExecuteCmd "$MAKE"
+
+	# Go back to the base directory
+	QuietExec "cd $BASEDIR"
+
+}
+
 ###############################################################################
 # Configure Gdb
 ###############################################################################

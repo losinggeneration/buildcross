@@ -337,6 +337,11 @@ Download()
 			fi
 			QuietExec "cd $BASEDIR"
 			;;
+		"nuttx")
+			if ! CheckExists .$NUTTX-downloaded || ! CheckExists $NUTTX.tar.gz; then
+				ExecuteCmd "wget -c http://downloads.sourceforge.net/project/nuttx/nuttx/$NUTTX/$NUTTX.tar.gz"
+			fi
+			;;
 		"gdb")
 			if ! CheckExists .$GDB-downloaded || ! CheckExists $GDB.tar.bz2; then
 				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/gdb/$GDB.tar.bz2"

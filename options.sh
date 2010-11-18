@@ -157,6 +157,7 @@ SetOptions()
 	GLIBC="glibc-$GLIBCVER"
 	UCLIBC="uClibc-$UCLIBCVER"
 	KERNEL="$KERNELNAME-$KERNELVER"
+	NUTTX="nuttx-$NUTTXVER"
 	GDB="gdb-$GDBVER"
 
 	# Binutils patches
@@ -209,6 +210,7 @@ SetOptions()
 	GCCBUILD="$SYSTEM/gccbuildelf"
 	NEWLIBBUILD="$SYSTEM/newlibbuildelf"
 	AVRLIBCBUILD="$SYSTEM/avrlibcbuild"
+	NUTTXDIR="$SYSTEM/$NUTTX"
 	GDBBUILD="$SYSTEM/gdbbuild"
 
 	# If the install directory doesn't exist make it
@@ -542,6 +544,14 @@ ParseArgs()
 			ConfigureGdb
 			return 0
 			;;
+		"-cnx")
+			ConfigureNuttX
+			return 0
+			;;
+		"-bnx")
+			BuildNuttX
+			return 0
+			;;
 		"-bgdb")
 			Remove $GDBBUILD/.installed
 			BuildGdb
@@ -681,6 +691,10 @@ ParseArgs()
 			;;
 		"rx")
 			SetOptions Rx
+			return 0
+			;;
+		"rxnuttx")
+			SetOptions RxNuttX
 			return 0
 			;;
 		"-distclean")

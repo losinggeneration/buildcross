@@ -111,7 +111,7 @@ Version 1.6:
 	-Imported some patches for GcLinux.
 	-Changed BuildDcLinux to BuildLinux.
 	-Moved kernel headers to download/patch the normal way. (AKA cleanup.)
-	-ConfigureuClibc now is extendable for other platforms with a case
+	-ConfigureuClibc now is extendible for other platforms with a case
 	 statement.
 	-Added -distclean option to remove sources, dot files, and file
 	 archives. Things needed to be done either before a release mainly.
@@ -190,7 +190,7 @@ Version 1.7:
 	-Better checks for build dependencies.
 
 Version 1.7.1:
-	-Changed Dreamcast.cfg backt to know good values.
+	-Changed Dreamcast.cfg back to know good values.
 
 Version 1.8:
 	-Killed dead spaces off of Changelog.
@@ -212,3 +212,4 @@ Version 1.8:
 	-Added Neo Freerunner target which is arm9tdmi
 	-Added devkitPro Gamecube/Wii ld files & rules
 	-Correctly check for fortran & obj-c++ if it's a selected language
+	-ChangeLog spelling fixes

@@ -131,7 +131,8 @@ SetOptions()
 	fi
 
 	# Load the default values per config
-	. ./options/$1.cfg
+	local filename="`echo $1.cfg | tr "[:upper:]" "[:lower:]"`"
+	. ./options/$filename
 
 	# These are potentially unset, so make sure they're set to at least $SYSTEM/
 	if [ ! "$NEWLIBBUILD" ]; then
@@ -278,6 +279,9 @@ Usage()
 	LogOutput "	-c2g Configure Glibc after the initial Gcc is installed"
 	LogOutput "	-bg Build and Install initial Glibc after initial Gcc"
 	LogOutput "	-b2g Build and install Glibc before final Gcc is built"
+	LogOutput
+	LogOutput "	-cnx Configure NuttX"
+	LogOutput "	-bnx Build NuttX"
 	LogOutput
 	LogOutput "	-cgdb Configure Gdb"
 	LogOutput "	-bgdb Build Gdb"
@@ -617,86 +621,6 @@ ParseArgs()
 			rm $SYSTEM/*/.*installed*
 			return 0
 			;;
-		"dreamcast")
-			SetOptions Dreamcast
-			return 0
-			;;
-		"dcarm")
-			SetOptions DcArm
-			return 0
-			;;
-		"dclinux")
-			SetOptions DcLinux
-			return 0
-			;;
-		"kos-arm")
-			SetOptions KosArm
-			return 0
-			;;
-		"genesis")
-			SetOptions Genesis
-			return 0
-			;;
-		"gamecube")
-			SetOptions Gamecube
-			return 0
-			;;
-		"gclinux")
-			SetOptions GcLinux
-			return 0
-			;;
-		"ix86")
-			SetOptions Ix86
-			return 0
-			;;
-		"archlinuxppc")
-			SetOptions ArchLinuxPPC
-			return 0
-			;;
-		"gba")
-			SetOptions Gba
-			return 0
-			;;
-		"arm")
-			SetOptions Arm
-			return 0
-			;;
-		"armlinux")
-			SetOptions ArmLinux
-			return 0
-			;;
-		"freerunner")
-			SetOptions NeoFreerunner
-			return 0
-			;;
-		"didj")
-			SetOptions Didj
-			return 0
-			;;
-		"sffl")
-			SetOptions sffl
-			return 0
-			;;
-		"saturn")
-			SetOptions Saturn
-			return 0
-			;;
-		"avr")
-			SetOptions Avr
-			return 0
-			;;
-		"arm-meego")
-			SetOptions ArmMeego
-			return 0
-			;;
-		"rx")
-			SetOptions Rx
-			return 0
-			;;
-		"rxnuttx")
-			SetOptions RxNuttX
-			return 0
-			;;
 		"-distclean")
 			DistClean
 			return 0
@@ -711,6 +635,15 @@ ParseArgs()
 		"-package")
 			Package
 			return 0
+			;;
+		# Check all remaining parameters for targets
+		*)
+			# If the option isn't found above, see if it's a configuration
+			# We also allow arbitrary capitalization
+			if [ -f "`echo options/$1.cfg | tr "[:upper:]" "[:lower:]"`" ]; then
+				SetOptions $1
+				return 0
+			fi
 			;;
 	esac
 

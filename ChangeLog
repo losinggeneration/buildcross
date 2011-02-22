@@ -212,3 +212,5 @@ Version 1.8:
 	-Added Neo Freerunner target which is arm9tdmi
 	-Added devkitPro Gamecube/Wii ld files & rules
 	-Correctly check for fortran & obj-c++ if it's a selected language
+	-Targets can now be easily added simply by adding them to the options
+	 directory and passing the filename (minus .cfg) to buildcross.sh

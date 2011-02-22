@@ -1,2 +1,2 @@
 * NuttX's include directory that I copy over has symlinks to the NuttX source directory. This is obviously bad if you remove buildcross later. So I should probably go back and make sure the correct files are copied over and not just symlinked.
-
+* I should probably add an option MAKEOPTS so in cases where -jX doesn't work, I can choose not to use it.

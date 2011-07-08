@@ -257,7 +257,7 @@ Usage()
 	LogOutput "	-all Configure and build all in correct order"
 	LogOutput "	-allc Configure and build all in correct order, but clean"
 	LogOutput "       objects and remove source after each is built"
-	LogOutput "	-single Run a single pass. Equivilant to -cb -bb -cfg -bfg"
+	LogOutput "	-single Run a single pass. Equivilant to -cb -bb -cfg -bfg [-ca -ba (AVR only)]"
 	LogOutput
 	LogOutput "	-cb Run configure for binutils"
 	LogOutput "	-bb Build and install binutils"
@@ -274,6 +274,9 @@ Usage()
 	LogOutput
 	LogOutput "	-cu Run configure on uClibc"
 	LogOutput "	-bu Build and install uClibc"
+	LogOutput
+	LogOutput "	-ca Run configure on AVR libc"
+	LogOutput "	-ba Build and install AVR libc"
 	LogOutput
 	LogOutput "	-cg Configure Glibc"
 	LogOutput "	-c2g Configure Glibc after the initial Gcc is installed"
@@ -308,7 +311,7 @@ Usage()
 	LogOutput
 	LogOutput "	-distclean Cleans All targets, archives, and dot files"
 	LogOutput
-	LogOutput "	-h | -help This message"
+	LogOutput "	-h|-help This message"
 	LogOutput "	-e Show some examples and setable variables"
 
 }
@@ -543,17 +546,17 @@ ParseArgs()
 			BuildGlibc "Final"
 			return 0
 			;;
-		"-cgdb")
-			Remove $GDBBUILD
-			ConfigureGdb
-			return 0
-			;;
 		"-cnx")
 			ConfigureNuttX
 			return 0
 			;;
 		"-bnx")
 			BuildNuttX
+			return 0
+			;;
+		"-cgdb")
+			Remove $GDBBUILD
+			ConfigureGdb
 			return 0
 			;;
 		"-bgdb")

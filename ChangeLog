@@ -217,3 +217,4 @@ Version 1.8:
 	-Targets can now be easily added simply by adding them to the options
 	 directory and passing the filename (minus .cfg) to buildcross.sh
 	-KOS now uses cp instead of ln by default
+	-Use a sane location for KOS's download location

@@ -134,6 +134,14 @@ SetOptions()
 	local filename="`echo $1.cfg | tr "[:upper:]" "[:lower:]"`"
 	. ./options/$filename
 
+	# KOS should have a sane default location rather than the build directory
+	if [ ! "$KOSLOCATION" ]; then
+		KOSLOCATION="$INSTALL/kos"
+		echo "KOSLOCATION: $KOSLOCATION"
+	fi
+
+	QuietExec "mkdir -p $KOSLOCATION"
+
 	# These are potentially unset, so make sure they're set to at least $SYSTEM/
 	if [ ! "$NEWLIBBUILD" ]; then
 		NEWLIBBUILD="$SYSTEM"

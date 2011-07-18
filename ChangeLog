@@ -197,8 +197,9 @@ Version 1.8:
 	-Gcc downloads should now overall be smaller in most cases since it's  now
 	 downloaded as gcc-core, gcc-g++, gcc-java, etc.
 	-Most targets should now work with changed Gcc behavior.
-	-Dreamcast now has GCC 4.4.0 which can be enabled if desired (good work
-	 on that BlueCrab) 1.8.1 will most likely use this as the default.
+	-Dreamcast now has GCC 4.5.2 (made possible by great work by BlueCrab).
+	 The older 3.4.6 version can still be enabled by editing
+	 options/dreamcast.cfg, but should not be needed.
 	-Misc version bumps
 	-Added a Gba and Arm Linux target (experimental)
 	-Version bumps to SFFL
@@ -215,3 +216,4 @@ Version 1.8:
 	-ChangeLog spelling fixes
 	-Targets can now be easily added simply by adding them to the options
 	 directory and passing the filename (minus .cfg) to buildcross.sh
+	-KOS now uses cp instead of ln by default

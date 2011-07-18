@@ -182,6 +182,11 @@ BuildNewlib()
 		# SHELF is defined in Dreamcast.cfg
 		if [ "$USEKOS" ]; then
 			if [ "$THREADS" = "posix" -o "$THREADS" = "yes" -o "$THREADS" = "kos" ]; then
+				local CPLN="cp -r"
+				if [ "$USELN" ]; then
+					CPLN="ln -nsf"
+				fi
+
 				# Make sure KOS is downloaded before trying to copy files from
 				# it
 				QuietExec "mkdir -p $KOSLOCATION"
@@ -197,6 +202,16 @@ BuildNewlib()
 				# file.
 				###############################################################
 				LogTitle "Symlinking KOS libraries..."
+				for i in "$INSTALL/$TARG/include/pthread.h" \
+					"$INSTALL/$TARG/include/sys/_pthread.h" \
+					"$INSTALL/$TARG/include/sys/_pthread.h" \
+					"$INSTALL/$TARG/include/sys/sched.h" \
+					"$INSTALL/$TARG/include/kos" \
+					"$INSTALL/$TARG/include/arch" \
+					"$INSTALL/$TARG/include/$KOSSYSINC"; do
+					[ -e "$i" ] && ExecuteCmd "rm -fr $i"
+				done
+
 				# KOS pthread.h is modified
 				ExecuteCmd "cp $KOSLOCATION/include/pthread.h $INSTALL/$TARG/include"
 				# to define _POSIX_THREADS
@@ -204,11 +219,11 @@ BuildNewlib()
 				# pthreads to kthreads mapping
 				ExecuteCmd "cp $KOSLOCATION/include/sys/sched.h $INSTALL/$TARG/include/sys"
 				# so KOS includes are available as kos/file.h
-				ExecuteCmd "ln -nsf $KOSLOCATION/include/kos $INSTALL/$TARG/include"
+				ExecuteCmd "$CPLN $KOSLOCATION/include/kos $INSTALL/$TARG/include"
 				# kos/thread.h requires arch/arch.h
-				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/$SYSTEM/include/arch $INSTALL/$TARG/include"
+				ExecuteCmd "$CPLN $KOSLOCATION/kernel/arch/$SYSTEM/include/arch $INSTALL/$TARG/include"
 				# arch/arch.h requires dc/video.h
-				ExecuteCmd "ln -nsf $KOSLOCATION/kernel/arch/$SYSTEM/include/$KOSSYSINC $INSTALL/$TARG/include"
+				ExecuteCmd "$CPLN $KOSLOCATION/kernel/arch/$SYSTEM/include/$KOSSYSINC $INSTALL/$TARG/include"
 			fi
 		fi
 

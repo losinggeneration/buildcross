@@ -302,6 +302,7 @@ Usage()
 	LogOutput "	-dcc Remove src directory and objects after each is built to"
 	LogOutput "      to save space."
 	LogOutput "	-k Setup and build kos (Be sure KOSLOCATION is set)"
+	LogOutput "	-nlk Ues ln instead of cp for kos headers when installing newlib"
 	LogOutput "	-u Use uClibc instead of Glibc for Linux compilers"
 	LogOutput "	-dcl Build the Dreamcast Linux compiler"
 	LogOutput "	-gcl Build the GameCube Linux compiler"
@@ -579,6 +580,10 @@ ParseArgs()
 			;;
 		"-k")
 			BuildKos
+			return 0
+			;;
+		"-nlk")
+			USELN=yes
 			return 0
 			;;
 		"-dcl")

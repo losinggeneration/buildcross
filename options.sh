@@ -140,8 +140,6 @@ SetOptions()
 		echo "KOSLOCATION: $KOSLOCATION"
 	fi
 
-	QuietExec "mkdir -p $KOSLOCATION"
-
 	# These are potentially unset, so make sure they're set to at least $SYSTEM/
 	if [ ! "$NEWLIBBUILD" ]; then
 		NEWLIBBUILD="$SYSTEM"

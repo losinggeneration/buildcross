@@ -1,6 +1,6 @@
 #!/bin/sh
 ###############################################################################
-# Copyright 2000-2010
+# Copyright 2000-2012
 #         Harley Laue (losinggeneration@gmail.com) and others (as noted).
 #         All rights reserved.
 ###############################################################################
@@ -22,7 +22,7 @@
 # Optional:
 # 3) Add your target to Usage()
 ###############################################################################
-BUILDCROSS_VERSION=1.7
+BUILDCROSS_VERSION=1.8
 # To reduce clutter I've moved functions into separate files.
 # These will include the functions so we can call them from  here.
 ###############################################################################

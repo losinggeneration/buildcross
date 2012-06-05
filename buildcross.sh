@@ -22,7 +22,7 @@
 # Optional:
 # 3) Add your target to Usage()
 ###############################################################################
-BUILDCROSS_VERSION=1.8
+BUILDCROSS_VERSION=1.8.1
 # To reduce clutter I've moved functions into separate files.
 # These will include the functions so we can call them from  here.
 ###############################################################################

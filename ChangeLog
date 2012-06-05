@@ -218,3 +218,6 @@ Version 1.8:
 	 directory and passing the filename (minus .cfg) to buildcross.sh
 	-KOS now uses cp instead of ln by default
 	-Use a sane location for KOS's download location
+
+Version 1.8.1:
+	-Remove a bad option passed to Dreamcast's newlib

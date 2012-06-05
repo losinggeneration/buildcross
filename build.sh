@@ -473,6 +473,15 @@ BuildGlibc()
 BuildKos()
 {
 	LogTitle "Building Kos"
+	case $KOSSYSINC in
+		"dc") ;;
+		"gba") ;;
+		"ia32") ;;
+		*)
+			LogError "No valid kos port selected"
+			QuietExec "false"
+			;;
+	esac
 	Download kos
 
 	QuietExec "cd $KOSLOCATION"
@@ -492,7 +501,7 @@ BuildKos()
 	Result "sed -e \"$KOSBASELINE c export KOS_BASE=\"$KOSLOCATION\"\" -i environ.sh"
 	LogOutput "Changed KOS_BASE with $KOSLOCATION"
 
-	if [ "$TARG" = "$SHELF" -o "$TARG" = "$ARMELF" ]; then
+	if [ "$KOSSYSINC" = "dc" ]; then
 		# Same as above for DC_ARM_BASE, but we use where the compiler is
 		# installed instead
 		ARMBASELINE=$(grep -n "^export DC_ARM_BASE\=" environ.sh | cut -f1 -d:)
@@ -507,8 +516,22 @@ BuildKos()
 
 		# Needed because we can't just use $SHELF for the cc prefix anymore
 		THISTARG=$SHELF
-	else
-		# if the arch isn't Dreamcast, it's ia32
+	elif [ "$KOSSYSINC" = "gba" ]; then
+		ARCHBASELINE=$(grep -n "^export KOS_ARCH=\"dreamcast\"" environ.sh)
+		sed -e "$ARCHBASELINE c export KOS_ARCH=\"gba\"" -i environ.sh
+		LogOutput "Changed KOS_ARCH to $ARCHBASELINE"
+
+		# Comment these two out if its not the dreamcast compiler
+		ARMBASELINE=$(grep -n "^export DC_ARM_BASE\=" environ.sh | cut -f1 -d:)
+		sed -e "$ARMBASELINE c #export DC_ARM_BASE=" -i environ.sh
+		LogOutput "Changed DC_ARM_BASE to $ARMBASELINE"
+
+		ARMPREFIXLINE=$(grep -n "^export DC_ARM_PREFIX\=" environ.sh | cut -f1 -d:)
+		sed -e "$ARMPREFIXLINE c #export DC_ARM_PREFIX=" -i environ.sh
+		LogOutput "Changed DC_ARM_PREFIX to $ARMPREFIXLINE"
+
+		THISTARG=$TARG
+	elif [ "$KOSSYSINC" = "ia32" ]; then
 		ARCHBASELINE=$(grep -n "^export KOS_ARCH=\"dreamcast\"" environ.sh)
 		sed -e "$ARCHBASELINE c export KOS_ARCH=\"ia32\"" -i environ.sh
 		LogOutput "Changed KOS_ARCH to $ARCHBASELINE"
@@ -523,6 +546,8 @@ BuildKos()
 		LogOutput "Changed DC_ARM_PREFIX to $ARMPREFIXLINE"
 
 		THISTARG=$TARG
+	else
+		LogError "No valid kos port selected"
 	fi
 
 	# Same as above but for KOS_CC_BASE
@@ -580,7 +605,8 @@ ConfigureNuttX()
 		# Now copy the headers to the compiler
 		QuietExec "cd .."
 		QuietExec "mkdir -p $INSTALL/$TARG"
-		ExecuteCmd "cp -r include $INSTALL/$TARG"
+		ExecuteCmd "make include/arch include/arch/chip include/arch/board include/nuttx/config.h"
+		ExecuteCmd "cp -Lr include $INSTALL/$TARG"
 
 		QuietExec "touch .configure"
 	else

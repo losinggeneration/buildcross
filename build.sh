@@ -69,23 +69,9 @@ BuildBin()
 ConfigureGcc()
 {
 	LogTitle "Configuring $1 Gcc"
-	for langs in $(echo $LANGUAGES | sed "s/,/ /g"); do
-		case $langs in
-			"c")
-				langs="core" ;;
-			"fortran")
-				# it's fortran for gcc >= 4.0 and g77 for < 4.0
-				[ `echo $GCCVER | cut -d"." -f1` -lt 4 ] && langs="g77" ;;
-			"c++")
-				langs="g++" ;;
-			"obj-c++")
-				langs="objc" ;;
-		esac
 
-		GccUntar $GCCVER $langs
-	done
-
-	Patch gcc $GCCVER $langs $GCCPATCH
+	# Try to Untar and Patch GCC if needed
+	UntarPatch gcc $GCCVER $GCCPATCH
 
 	if ! CheckExists $GCCBUILD/.configure-$1; then
 		# This will remove all files, but leave hidden ones

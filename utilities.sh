@@ -237,11 +237,7 @@ GccUntar()
 ###############################################################################
 Untar()
 {
-	if [ "$1" = "gcc" ]; then
-		lver="$3-$2"
-	else
-		lver="$2"
-	fi
+	lver="$2"
 
 	# Make sure to it's downloaded
 	Download $1 $lver
@@ -277,9 +273,9 @@ Download()
 			fi
 			;;
 		"gcc")
-			if ! CheckExists .$1-$2-downloaded || ! CheckExists $1-$2.tar.bz2; then
-				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/gcc/$GCC/$1-$2.tar.bz2"
-				QuietExec "touch .$1-$2-downloaded"
+			if ! CheckExists .$GCC-downloaded || ! CheckExists $GCC.tar.bz2; then
+				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/gcc/$GCC/$GCC.tar.bz2"
+				QuietExec "touch .$GCC-downloaded"
 			fi
 			;;
 		"newlib")
@@ -370,11 +366,7 @@ Patch()
 	fi
 
 	# We need to get past the name/version so shift the params two or three
-	if [ "$1" = "gcc" ]; then
-		shift 3
-	else
-		shift 2
-	fi
+	shift 2
 
 	if [ ! "$PLEVEL" ]; then
 		PLEVEL=1

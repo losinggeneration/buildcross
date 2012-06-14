@@ -1,6 +1,18 @@
+diff -ruN gcc-4.7.0/gcc/config/sh/sh.c gcc-4.7.0-kos/gcc/config/sh/sh.c
+--- gcc-4.7.0/gcc/config/sh/sh.c	2012-03-05 13:52:44.000000000 -0500
++++ gcc-4.7.0-kos/gcc/config/sh/sh.c	2012-06-09 21:58:01.000000000 -0400
+@@ -747,8 +747,6 @@
+     if (! VALID_REGISTER_P (ADDREGNAMES_REGNO (regno)))
+       sh_additional_register_names[regno][0] = '\0';
+ 
+-  flag_omit_frame_pointer = (PREFERRED_DEBUGGING_TYPE == DWARF2_DEBUG);
+-
+   if ((flag_pic && ! TARGET_PREFERGOT)
+       || (TARGET_SHMEDIA && !TARGET_PT_FIXED))
+     flag_no_function_cse = 1;
 diff -ruN gcc-4.7.0/gcc/configure gcc-4.7.0-kos/gcc/configure
 --- gcc-4.7.0/gcc/configure	2012-03-08 08:54:54.000000000 -0500
-+++ gcc-4.7.0-kos/gcc/configure	2012-06-04 19:16:35.000000000 -0400
++++ gcc-4.7.0-kos/gcc/configure	2012-06-11 12:38:05.000000000 -0400
 @@ -11262,7 +11262,7 @@
      target_thread_file='single'
      ;;
@@ -12,7 +24,7 @@ diff -ruN gcc-4.7.0/gcc/configure gcc-4.7.0-kos/gcc/configure
    *)
 diff -ruN gcc-4.7.0/libgcc/config/sh/crt1.S gcc-4.7.0-kos/libgcc/config/sh/crt1.S
 --- gcc-4.7.0/libgcc/config/sh/crt1.S	2011-11-02 10:33:56.000000000 -0400
-+++ gcc-4.7.0-kos/libgcc/config/sh/crt1.S	2012-06-05 11:21:34.000000000 -0400
++++ gcc-4.7.0-kos/libgcc/config/sh/crt1.S	2012-06-11 12:38:05.000000000 -0400
 @@ -1,1369 +1,202 @@
 -/* Copyright (C) 2000, 2001, 2003, 2004, 2005, 2006, 2009, 2011
 -   Free Software Foundation, Inc.
@@ -1564,11 +1576,91 @@ diff -ruN gcc-4.7.0/libgcc/config/sh/crt1.S gcc-4.7.0-kos/libgcc/config/sh/crt1.
 -	.ualong	0x0
 -#endif /* VBR_SETUP */
 -#endif /* ! __SH5__ */
+diff -ruN gcc-4.7.0/libgcc/config/sh/fake-kos.S gcc-4.7.0-kos/libgcc/config/sh/fake-kos.S
+--- gcc-4.7.0/libgcc/config/sh/fake-kos.S	1969-12-31 19:00:00.000000000 -0500
++++ gcc-4.7.0-kos/libgcc/config/sh/fake-kos.S	2012-06-11 13:31:28.000000000 -0400
+@@ -0,0 +1,75 @@
++! Weakly linked symbols used to get GCC to hopefully compile itself properly.
++! These will be replaced by the real symbols in actual compiled programs.
++
++    ! crt1.S required symbols
++    .weak   ___kos_init_flags
++    .weak   _arch_main
++
++    ! gthr-kos.h required symbols
++    .weak   _mutex_is_locked
++    .weak   _mutex_destroy
++    .weak   _mutex_lock
++    .weak   _mutex_trylock
++    .weak   _mutex_lock_timed
++    .weak   _mutex_unlock
++
++    .weak   _thd_create
++    .weak   _thd_join
++    .weak   _thd_detach
++    .weak   _thd_pass
++    .weak   _thd_exit
++    .weak   _thd_get_current
++
++    .weak   _kthread_setspecific
++    .weak   _kthread_getspecific
++    .weak   _kthread_key_create
++    .weak   _kthread_key_delete
++    .weak   _kthread_once
++
++    .weak   _cond_destroy
++    .weak   _cond_wait
++    .weak   _cond_wait_timed
++    .weak   _cond_broadcast
++    .weak   _cond_signal
++
++    ! Things needed by emutls
++    .weak   _free
++    .weak   _abort
++    .weak   _malloc
++    .weak   _realloc
++    .weak   _calloc
++
++___kos_init_flags:
++    .long   0
++
++_arch_main:
++_mutex_is_locked:
++_mutex_unlock:
++_mutex_destroy:
++_mutex_lock:
++_mutex_trylock:
++_mutex_lock_timed:
++_thd_create:
++_thd_join:
++_thd_detach:
++_thd_pass:
++_thd_exit:
++_thd_get_current:
++_kthread_setspecific:
++_kthread_getspecific:
++_kthread_key_create:
++_kthread_key_delete:
++_kthread_once:
++_cond_destroy:
++_cond_wait:
++_cond_wait_timed:
++_cond_broadcast:
++_cond_signal:
++_free:
++_abort:
++_malloc:
++_realloc:
++_calloc:
++    rts
++    mov     #-1, r0
++    
+\ No newline at end of file
 diff -ruN gcc-4.7.0/libgcc/config/sh/gthr-kos.h gcc-4.7.0-kos/libgcc/config/sh/gthr-kos.h
 --- gcc-4.7.0/libgcc/config/sh/gthr-kos.h	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-4.7.0-kos/libgcc/config/sh/gthr-kos.h	2012-06-05 11:03:08.000000000 -0400
-@@ -0,0 +1,374 @@
-+/* Copyright (C) 2009, 2010, 2011 Lawrence Sebald */
++++ gcc-4.7.0-kos/libgcc/config/sh/gthr-kos.h	2012-06-11 20:06:32.000000000 -0400
+@@ -0,0 +1,355 @@
++/* Copyright (C) 2009, 2010, 2011, 2012 Lawrence Sebald */
 +
 +/* Threads compatibility routines for libgcc2 and libobjc.  */
 +/* Compile this one with gcc.  */
@@ -1608,7 +1700,6 @@ diff -ruN gcc-4.7.0/libgcc/config/sh/gthr-kos.h gcc-4.7.0-kos/libgcc/config/sh/g
 +#include <kos/thread.h>
 +#include <kos/tls.h>
 +#include <kos/mutex.h>
-+#include <kos/recursive_lock.h>
 +#include <kos/once.h>
 +#include <kos/cond.h>
 +#include <time.h>
@@ -1616,31 +1707,16 @@ diff -ruN gcc-4.7.0/libgcc/config/sh/gthr-kos.h gcc-4.7.0-kos/libgcc/config/sh/g
 +/* These should work just fine. */
 +typedef kthread_key_t __gthread_key_t;
 +typedef kthread_once_t __gthread_once_t;
-+typedef mutex_t * __gthread_mutex_t;
-+typedef condvar_t * __gthread_cond_t;
-+typedef kthread_t * __gthread_t;
++typedef mutex_t __gthread_mutex_t;
++typedef mutex_t __gthread_recursive_mutex_t;
++typedef condvar_t __gthread_cond_t;
++typedef kthread_t *__gthread_t;
 +typedef struct timespec __gthread_time_t;
 +
-+typedef struct {
-+    recursive_lock_t *koslock;
-+} __gthread_recursive_mutex_t;
-+
-+static void __gthr_mutex_init(__gthread_mutex_t *__mutex) {
-+    *__mutex = mutex_create();
-+}
-+
-+static void __gthr_recursive_mutex_init(__gthread_recursive_mutex_t *__mutex) {
-+    __mutex->koslock = rlock_create();
-+}
-+
-+static void __gthr_cond_init(__gthread_cond_t *__cond) {
-+    *__cond = cond_create();
-+}
-+
 +#define __GTHREAD_ONCE_INIT KTHREAD_ONCE_INIT
-+#define __GTHREAD_MUTEX_INIT_FUNCTION __gthr_mutex_init
-+#define __GTHREAD_RECURSIVE_MUTEX_INIT_FUNCTION __gthr_recursive_mutex_init
-+#define __GTHREAD_COND_INIT_FUNCTION __gthr_cond_init
++#define __GTHREAD_MUTEX_INIT MUTEX_INITIALIZER
++#define __GTHREAD_RECURSIVE_MUTEX_INIT RECURSIVE_MUTEX_INITIALIZER
++#define __GTHREAD_COND_INIT COND_INITIALIZER
 +
 +static inline int __gthread_active_p(void) {
 +  return 1;
@@ -1724,26 +1800,28 @@ diff -ruN gcc-4.7.0/libgcc/config/sh/gthr-kos.h gcc-4.7.0-kos/libgcc/config/sh/g
 +
 +/* Allocate a mutex. */
 +static inline int __gthread_objc_mutex_allocate(objc_mutex_t mutex) {
-+    mutex_t *m = mutex_create();
++    mutex->backend = objc_malloc(sizeof(mutex_t));
 +
-+    if(m) {
-+        mutex->backend = (void *)m;
-+        return 0;
++    if(mutex_init((mutex_t *)mutex->backend, MUTEX_TYPE_NORMAL)) {
++        objc_free(mutex->backend);
++        mutex->backend = NULL;
++        return -1;
 +    }
 +
-+    mutex->backend = NULL;
-+    return -1;
++    return 0;
 +}
 +
 +/* Deallocate a mutex. */
 +static inline int __gthread_objc_mutex_deallocate(objc_mutex_t mutex) {
 +    mutex_t *m = (mutex_t *)mutex->backend;
 +
-+    if(mutex_is_locked(m)) {
++    if(mutex_is_locked(m))
 +        mutex_unlock(m);
-+    }
 +
-+    mutex_destroy(m);
++    if(mutex_destroy(m))
++        return -1;
++
++    objc_free(m);
 +    mutex->backend = NULL;
 +
 +    return 0;
@@ -1761,28 +1839,30 @@ diff -ruN gcc-4.7.0/libgcc/config/sh/gthr-kos.h gcc-4.7.0-kos/libgcc/config/sh/g
 +
 +/* Unlock the mutex. */
 +static inline int __gthread_objc_mutex_unlock(objc_mutex_t mutex) {
-+    mutex_unlock((mutex_t *)mutex->backend);
-+    return 0;
++    return mutex_unlock((mutex_t *)mutex->backend);
 +}
 +
 +/* Backend condition mutex functions */
 +
 +/* Allocate a condition. */
 +static inline int __gthread_objc_condition_allocate(objc_condition_t cond) {
-+    condvar_t *c = cond_create();
++    cond->backend = objc_malloc(sizeof(condvar_t));
 +
-+    if(c) {
-+        cond->backend = (void *)c;
-+        return 0;
++    if(cond_init((condvar_t *)cond->backend)) {
++        objc_free(cond->backend);
++        cond->backend = NULL;
++        return -1;
 +    }
 +
-+    cond->backend = NULL;
-+    return -1;
++    return 0;
 +}
 +
 +/* Deallocate a condition. */
 +static inline int __gthread_objc_condition_deallocate(objc_condition_t cond) {
-+    cond_destroy((condvar_t *)cond->backend);
++    if(cond_destroy((condvar_t *)cond->backend))
++        return -1;
++
++    objc_free(cond->backend);
 +    cond->backend = NULL;
 +    return 0;
 +}
@@ -1795,14 +1875,12 @@ diff -ruN gcc-4.7.0/libgcc/config/sh/gthr-kos.h gcc-4.7.0-kos/libgcc/config/sh/g
 +
 +/* Wake up all threads waiting on this condition. */
 +static inline int __gthread_objc_condition_broadcast(objc_condition_t cond) {
-+    cond_broadcast((condvar_t *)cond->backend);
-+    return 0;
++    return cond_broadcast((condvar_t *)cond->backend);
 +}
 +
 +/* Wake up one thread waiting on this condition. */
 +static inline int __gthread_objc_condition_signal(objc_condition_t cond) {
-+    cond_signal((condvar_t *)cond->backend);
-+    return 0;
++    return cond_signal((condvar_t *)cond->backend);
 +}
 +
 +#else /* _LIBOBJC */
@@ -1831,47 +1909,44 @@ diff -ruN gcc-4.7.0/libgcc/config/sh/gthr-kos.h gcc-4.7.0-kos/libgcc/config/sh/g
 +}
 +
 +static inline int __gthread_mutex_destroy(__gthread_mutex_t *__mutex) {
-+    mutex_destroy(*__mutex);
-+    return 0;
++    return mutex_destroy(__mutex);
 +}
 +
 +static inline int __gthread_mutex_lock(__gthread_mutex_t *__mutex) {
-+    return mutex_lock(*__mutex);
++    return mutex_lock(__mutex);
 +}
 +
 +static inline int __gthread_mutex_trylock(__gthread_mutex_t *__mutex) {
-+    return mutex_trylock(*__mutex);
++    return mutex_trylock(__mutex);
 +}
 +
 +static inline int __gthread_mutex_unlock(__gthread_mutex_t *__mutex) {
-+    mutex_unlock(*__mutex);
-+    return 0;
++    return mutex_unlock(__mutex);
 +}
 +
 +static inline int __gthread_recursive_mutex_lock(__gthread_recursive_mutex_t *__mutex) {
-+    return rlock_lock(__mutex->koslock);
++    return mutex_lock(__mutex);
 +}
 +
 +static inline int __gthread_recursive_mutex_trylock(__gthread_recursive_mutex_t *__mutex) {
-+    return rlock_trylock(__mutex->koslock);
++    return mutex_trylock(__mutex);
 +}
 +
 +static inline int __gthread_recursive_mutex_unlock(__gthread_recursive_mutex_t *__mutex) {
-+    return rlock_unlock(__mutex->koslock);
++    return mutex_unlock(__mutex);
 +}
 +
 +static inline int __gthread_cond_broadcast(__gthread_cond_t *cond) {
-+    cond_broadcast(*cond);
-+    return 0;
++    return cond_broadcast(cond);
 +}
 +
 +static inline int __gthread_cond_wait(__gthread_cond_t *cond, __gthread_mutex_t *mutex) {
-+    return cond_wait(*cond, *mutex);
++    return cond_wait(cond, mutex);
 +}
 +
 +static inline int __gthread_cond_wait_recursive(__gthread_cond_t *cond,
 +                                                __gthread_recursive_mutex_t *mutex) {
-+    return cond_wait_recursive(*cond, mutex->koslock);
++    return cond_wait(cond, mutex);
 +}
 +
 +/* C++0x support functions */
@@ -1906,158 +1981,55 @@ diff -ruN gcc-4.7.0/libgcc/config/sh/gthr-kos.h gcc-4.7.0-kos/libgcc/config/sh/g
 +static inline int __gthread_mutex_timedlock(__gthread_mutex_t *m,
 +                                            const __gthread_time_t *timeout) {
 +    int t = (int)(timeout->tv_sec + (timeout->tv_nsec / 1000));
-+    return mutex_lock_timed(*m, t);
++    return mutex_lock_timed(m, t);
 +}
 +
 +static inline int __gthread_recursive_mutex_timedlock(__gthread_recursive_mutex_t *l,
 +                                                      const __gthread_time_t *timeout) {
 +    int t = (int)(timeout->tv_sec + (timeout->tv_nsec / 1000));
-+    return rlock_lock_timed(l->koslock, t);
++    return mutex_lock_timed(l, t);
 +}
 +
 +static inline int __gthread_cond_signal(__gthread_cond_t *cond) {
-+    cond_signal(*cond);
-+    return 0;
++    return cond_signal(cond);
 +}
 +
 +static inline int __gthread_cond_timedwait(__gthread_cond_t *cond,
 +                                           __gthread_mutex_t *mutex,
 +                                           const __gthread_time_t *timeout) {
 +    int t = (int)(timeout->tv_sec + (timeout->tv_nsec / 1000));
-+    return cond_wait_timed(*cond, *mutex, t);
++    return cond_wait_timed(cond, mutex, t);
 +}
 +
 +static inline int __gthread_cond_timedwait_recursive(__gthread_cond_t *cond,
 +                                                     __gthread_recursive_mutex_t *l,
 +                                                     const __gthread_time_t *timeout) {
 +    int t = (int)(timeout->tv_sec + (timeout->tv_nsec / 1000));
-+    return cond_wait_timed_recursive(*cond, l->koslock, t);
++    return cond_wait_timed(cond, l, t);
 +}
 +
 +static inline int __gthread_cond_destroy(__gthread_cond_t *cond) {
-+    cond_destroy(*cond);
-+    return 0;
++    return cond_destroy(cond);
 +}
 +
 +#endif /* _LIBOBJC */
 +
 +#endif /* ! GCC_GTHR_KOS_H */
-diff -ruN gcc-4.7.0/libgcc/config/sh/kos-weak.S gcc-4.7.0-kos/libgcc/config/sh/kos-weak.S
---- gcc-4.7.0/libgcc/config/sh/kos-weak.S	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-4.7.0-kos/libgcc/config/sh/kos-weak.S	2012-06-05 11:18:06.000000000 -0400
-@@ -0,0 +1,96 @@
-+! Weakly linked symbols used to get GCC to hopefully compile itself properly.
-+! These will be replaced by the real symbols in actual compiled programs.
-+
-+    ! crt1.S required symbols
-+    .weak   ___kos_init_flags
-+    .weak   _arch_main
-+
-+    ! gthr-kos.h required symbols
-+    .weak   _mutex_create
-+    .weak   _mutex_is_locked
-+    .weak   _mutex_destroy
-+    .weak   _mutex_lock
-+    .weak   _mutex_trylock
-+    .weak   _mutex_lock_timed
-+    .weak   _mutex_unlock
-+
-+    .weak   _thd_create
-+    .weak   _thd_join
-+    .weak   _thd_detach
-+    .weak   _thd_pass
-+    .weak   _thd_exit
-+    .weak   _thd_get_current
-+
-+    .weak   _kthread_setspecific
-+    .weak   _kthread_getspecific
-+    .weak   _kthread_key_create
-+    .weak   _kthread_key_delete
-+    .weak   _kthread_once
-+
-+    .weak   _rlock_create
-+    .weak   _rlock_destroy
-+    .weak   _rlock_lock
-+    .weak   _rlock_trylock
-+    .weak   _rlock_unlock
-+    .weak   _rlock_lock_timed
-+
-+    .weak   _cond_create
-+    .weak   _cond_destroy
-+    .weak   _cond_wait
-+    .weak   _cond_wait_timed
-+    .weak   _cond_broadcast
-+    .weak   _cond_signal
-+    .weak   _cond_wait_recursive
-+    .weak   _cond_wait_timed_recursive
-+
-+    ! Things needed by emutls
-+    .weak   _free
-+    .weak   _abort
-+    .weak   _malloc
-+    .weak   _realloc
-+    .weak   _calloc
-+
-+___kos_init_flags:
-+    .long   0
-+
-+_arch_main:
-+_mutex_create:
-+_mutex_is_locked:
-+_mutex_unlock:
-+_mutex_destroy:
-+_mutex_lock:
-+_mutex_trylock:
-+_mutex_lock_timed:
-+_thd_create:
-+_thd_join:
-+_thd_detach:
-+_thd_pass:
-+_thd_exit:
-+_thd_get_current:
-+_kthread_setspecific:
-+_kthread_getspecific:
-+_kthread_key_create:
-+_kthread_key_delete:
-+_kthread_once:
-+_rlock_create:
-+_rlock_destroy:
-+_rlock_lock:
-+_rlock_trylock:
-+_rlock_unlock:
-+_rlock_lock_timed:
-+_cond_create:
-+_cond_destroy:
-+_cond_wait:
-+_cond_wait_timed:
-+_cond_broadcast:
-+_cond_signal:
-+_cond_wait_recursive:
-+_cond_wait_timed_recursive:
-+_free:
-+_abort:
-+_malloc:
-+_realloc:
-+_calloc:
-+    rts
-+    mov     #-1, r0
-+    
-\ No newline at end of file
 diff -ruN gcc-4.7.0/libgcc/config/sh/t-sh gcc-4.7.0-kos/libgcc/config/sh/t-sh
 --- gcc-4.7.0/libgcc/config/sh/t-sh	2011-11-07 12:14:32.000000000 -0500
-+++ gcc-4.7.0-kos/libgcc/config/sh/t-sh	2012-06-05 10:43:34.000000000 -0400
++++ gcc-4.7.0-kos/libgcc/config/sh/t-sh	2012-06-11 13:30:55.000000000 -0400
 @@ -24,6 +24,8 @@
    $(LIB1ASMFUNCS_CACHE)
  LIB1ASMFUNCS_CACHE = _ic_invalidate _ic_invalidate_array
  
-+LIB2ADD = $(srcdir)/config/sh/kos-weak.S
++LIB2ADD = $(srcdir)/config/sh/fake-kos.S
 +
  crt1.o: $(srcdir)/config/sh/crt1.S
  	$(gcc_compile) -c $<
  
 diff -ruN gcc-4.7.0/libgcc/configure gcc-4.7.0-kos/libgcc/configure
 --- gcc-4.7.0/libgcc/configure	2012-01-23 01:25:28.000000000 -0500
-+++ gcc-4.7.0-kos/libgcc/configure	2012-06-04 19:19:26.000000000 -0400
++++ gcc-4.7.0-kos/libgcc/configure	2012-06-11 12:38:05.000000000 -0400
 @@ -4801,6 +4801,7 @@
      tpf)	thread_header=config/s390/gthr-tpf.h ;;
      vxworks)	thread_header=config/gthr-vxworks.h ;;
@@ -2066,35 +2038,3 @@ diff -ruN gcc-4.7.0/libgcc/configure gcc-4.7.0-kos/libgcc/configure
  esac
  
  # Substitute configuration variables
-diff -ruN gcc-4.7.0/libstdc++-v3/include/ext/concurrence.h gcc-4.7.0-kos/libstdc++-v3/include/ext/concurrence.h
---- gcc-4.7.0/libstdc++-v3/include/ext/concurrence.h	2011-01-30 17:39:36.000000000 -0500
-+++ gcc-4.7.0-kos/libstdc++-v3/include/ext/concurrence.h	2012-06-04 20:52:33.000000000 -0400
-@@ -283,6 +283,12 @@
-       _S_destroy(_Rm* __mx)
-       { __gthread_mutex_destroy(&__mx->actual); }
- 
-+    // matches kos
-+    template<typename _Rm>
-+      static typename __enable_if<sizeof(&_Rm::koslock), void>::__type
-+      _S_destroy(_Rm* __mx)
-+      { rlock_destroy(__mx->koslock); }
-+
-     // matches when there's only one mutex type
-     template<typename _Rm>
-       static typename
-diff -ruN gcc-4.7.0/libstdc++-v3/include/std/mutex gcc-4.7.0-kos/libstdc++-v3/include/std/mutex
---- gcc-4.7.0/libstdc++-v3/include/std/mutex	2012-02-07 04:19:27.000000000 -0500
-+++ gcc-4.7.0-kos/libstdc++-v3/include/std/mutex	2012-06-04 21:00:52.000000000 -0400
-@@ -120,6 +120,12 @@
-       _S_destroy(_Rm* __mx)
-       { __gthread_mutex_destroy(&__mx->actual); }
- 
-+    // matches kos
-+    template<typename _Rm>
-+      static typename enable_if<sizeof(&_Rm::koslock), void>::type
-+      _S_destroy(_Rm* __mx)
-+      { rlock_destroy(__mx->koslock); }
-+
-     // matches a gthr-win32.h recursive mutex
-     template<typename _Rm>
-       static typename enable_if<sizeof(&_Rm::sema), void>::type

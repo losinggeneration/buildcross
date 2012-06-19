@@ -225,6 +225,12 @@ Version 1.8.1:
 Version 1.9:
 	-Gcc 4.7.0 removed per-language tarballs, so we're using the single
 	 tarball across the board now.
-	-Bumped Dreamcast GCC version to 4.7.0 and newlib to 1.20.0. Also, the ARM
+	-Bumped Dreamcast GCC version to 4.7.1 and newlib to 1.20.0. Also, the ARM
 	 cross compiller is now using arm-eabi instead of arm-elf since arm-elf is
 	 considered deprecated in GCC 4.7.0 and will likely be removed in 4.8.0.
+	-Switched to KOS's git tree.
+	-Add check for git to checkdeps.
+	-Fixed where .kos-download and .kos-ports-download end up.
+	-Add checks for common C libraries that need to be installed (GMP, MPFR,
+	 & MPC.) This involved finally writing the function to check gcc
+	 compilation for a header.

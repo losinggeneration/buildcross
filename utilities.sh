@@ -592,9 +592,13 @@ CheckDeps()
 		NOTFOUND="$NOTFOUND, svn"
 	fi
 
+	if ! DependsResult "git"; then
+		NOTFOUND="$NOTFOUND, git"
+	fi
 	if ! DependsResult "flex"; then
 		NOTFOUND="$NOTFOUND, flex"
 	fi
+
 
 	# If any aren't found, we need to tell the user
 	if [ "$NOTFOUND" != "" ]; then
@@ -606,6 +610,10 @@ CheckDeps()
 		else
 			LogOutput "The following dependencies were not found: $NOTFOUND"
 		fi
+	else
+		DependsCLibraryResult "gmp.h"
+		DependsCLibraryResult "mpfr.h"
+		DependsCLibraryResult "mpc.h"
 	fi
 }
 
@@ -655,6 +663,35 @@ DependsResult()
 		fi
 		QuietExec "rm .tempdep"
 		return 1
+	fi
+}
+
+
+###############################################################################
+# Print dependency check for a C library
+###############################################################################
+DependsCLibraryResult() {
+	# I'd actually have preferred to use this style:
+	# gcc -pipe -xc -c -o /dev/null <(echo "#include <$1>") &>/dev/null
+	# Unfortunately, I don't think this is as portable as what I have below.
+	(cat << EOF
+		#include <$1>
+EOF
+	) | gcc -pipe -xc -c -o /dev/null - &> /dev/null
+
+	if [ $? -eq 0 ]; then
+		# don't mess up logging
+		if [ "$SILENT" -eq 0 ]; then
+			LogOutput "$1: $TEXTFOUND"
+		else
+			LogOutput "$1: [FOUND]"
+		fi
+	else
+		if [ "$SILENT" -eq 0 ]; then
+			LogError "$1: $TEXTNOTFOUND"
+		else
+			LogError "$1: [NOT FOUND]"
+		fi
 	fi
 }
 

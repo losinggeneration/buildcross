@@ -260,6 +260,17 @@ Untar()
 	QuietExec "touch $SYSTEM/$1-$2/.untared-$lver"
 }
 
+GetKernelBase() {
+	local x=$(echo $KERNEL | sed "s/.*-\([0-9].[0-9]\).*/\1/")
+	local major=$(echo $x | sed "s/\([0-9]\).*/\1/")
+	local minor=$(echo $x | sed "s/$major\.\(.*\)/\1/")
+	if [ $major -eq 3 -a $minor -gt 0 ]; then
+		echo "3.x"
+	else
+		echo "$x"
+	fi
+}
+
 ###############################################################################
 # Download the file
 ###############################################################################
@@ -315,7 +326,7 @@ Download()
 				if [ $(echo $KERNEL | grep libc) ]; then
 					ExecuteCmd "wget -c http://ep09.pld-linux.org/~mmazur/linux-libc-headers/$KERNEL.tar.bz2"
 				else
-					ExecuteCmd "wget -c http://www.kernel.org/pub/linux/kernel/v2.6/$KERNEL.tar.bz2"
+					ExecuteCmd "wget -c http://www.kernel.org/pub/linux/kernel/v$(GetKernelBase)/$KERNEL.tar.bz2"
 				fi
 				QuietExec "touch .$KERNEL-downloaded"
 			fi

@@ -234,3 +234,10 @@ Version 1.9:
 	-Add checks for common C libraries that need to be installed (GMP, MPFR,
 	 & MPC.) This involved finally writing the function to check gcc
 	 compilation for a header.
+	-Fix silent so it's still in color (since there's an option to remove color)
+	-Fixed Linux kernel downloading for > 2.6 kernels.
+	-Bumped Dreamcast Linux versions: GCC 4.7.1, Binutils 2.22, GDB 7.4,
+	 Linux 3.4.3, uClibc 0.9.33.2, glibc 2.15 (does not work.)
+	-Changed Dreamcast Linux's options and added objc & obj-c++ to build.
+	-Bumped Didj uClibc toolchain versions: GCC 4.7.1, Binutils 2.22,
+	 GDB 7.4.1, & uClibc 0.9.33.2. Pulled in uClibc toolchain patches for toolchain.

@@ -310,9 +310,18 @@ Download()
 			fi
 			;;
 		"glibc")
-			if ! CheckExists .$GLIBC-downloaded || ! CheckExists $GLIBC.tar.bz2; then
-				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/glibc/$GLIBC.tar.bz2"
-				QuietExec "touch .$GLIBC-downloaded"
+			if [ "$USEEGLIBC" = "yes" ]; then
+				if ! CheckExists "$SYSTEM/$GLIBC/.$GLIBC-downloaded" || ! test -d "$SISTEM/$GLIBC"; then
+					QuietExec "cd $SYSTEM"
+					ExecuteCmd "svn co http://www.eglibc.org/svn/branches/$GLIBC"
+					QuietExec "touch $GLIBC/.$GLIBC-downloaded"
+					QuietExec "cd .."
+				fi
+			else
+				if ! CheckExists .$GLIBC-downloaded || ! CheckExists $GLIBC.tar.bz2; then
+					ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/glibc/$GLIBC.tar.bz2"
+					QuietExec "touch .$GLIBC-downloaded"
+				fi
 			fi
 			;;
 		"avr-libc")

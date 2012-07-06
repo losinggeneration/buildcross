@@ -380,10 +380,18 @@ ConfigureGlibc()
 			# Prepare the linux headers
 			ConfigureKernelHeaders
 
-			# Now get the Glibc headers installed
-			QuietExec "cd $BASEDIR/$GLIBCDIR"
+			if [ "$USEEGLIBC" = "yes" ]; then
+				echo $GLIBC
+				QuietExec "cd $SYSTEM/$GLIBC/libc"
+				GLIBCCONF="./configure"
+			else
+				# Now get the Glibc headers installed
+				QuietExec "cd $BASEDIR/$GLIBCDIR"
 
-			CC=gcc ExecuteCmd "../$GLIBC/configure $GLIBCHOPTS" "Configuring Glibc Headers"
+				GLIBCCONF="../$GLIBC/configure"
+			fi
+
+			CC=gcc ExecuteCmd "$GLIBCCONF $GLIBCHOPTS" "Configuring Glibc Headers"
 			ExecuteCmd "$MAKE cross-compiling=yes install_root=$SYSROOT install-headers" "Installing Glibc Headers"
 
 			# Taken/adapted from CrossTool

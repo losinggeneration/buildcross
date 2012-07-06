@@ -161,7 +161,12 @@ SetOptions()
 	GCC="gcc-$GCCVER"
 	NEWLIB="newlib-$NEWLIBVER"
 	AVRLIBC="avr-libc-$AVRLIBCVER"
-	GLIBC="glibc-$GLIBCVER"
+	if [ "$USEEGLIBC" = "yes" ]; then
+		# convert version . into _ and only take the first two parts
+		GLIBC="eglibc-`echo $GLIBCVER | tr . _ | cut -d_ -f1-2`"
+	else
+		GLIBC="glibc-$GLIBCVER"
+	fi
 	UCLIBC="uClibc-$UCLIBCVER"
 	KERNEL="$KERNELNAME-$KERNELVER"
 	NUTTX="nuttx-$NUTTXVER"
@@ -610,6 +615,11 @@ ParseArgs()
 			;;
 		"-g")
 			unset USEUCLIBC
+			return 0
+			;;
+		"-eg")
+			unset USEUCLIBC
+			USEEGLIBC=yes
 			return 0
 			;;
 		"-native")

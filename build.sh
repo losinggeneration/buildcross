@@ -375,22 +375,19 @@ ConfigureGlibc()
 	QuietExec "mkdir -p $GLIBCDIR"
 
 	if ! CheckExists $GLIBCDIR/.configure-$1; then
-		QuietExec "cd $BASEDIR/$GCLIBCDIR"
 		if [ "$1" = "Headers" ]; then
 			# Prepare the linux headers
 			ConfigureKernelHeaders
+			QuietExec "cd $BASEDIR/$GLIBCDIR"
 
+			# The config is in a different directory for eglibc
 			if [ "$USEEGLIBC" = "yes" ]; then
-				echo $GLIBC
-				QuietExec "cd $SYSTEM/$GLIBC/libc"
-				GLIBCCONF="./configure"
+				GLIBCCONF="../$GLIBC/libc/configure"
 			else
-				# Now get the Glibc headers installed
-				QuietExec "cd $BASEDIR/$GLIBCDIR"
-
 				GLIBCCONF="../$GLIBC/configure"
 			fi
 
+			# Now get the Glibc headers installed
 			CC=gcc ExecuteCmd "$GLIBCCONF $GLIBCHOPTS" "Configuring Glibc Headers"
 			ExecuteCmd "$MAKE cross-compiling=yes install_root=$SYSROOT install-headers" "Installing Glibc Headers"
 
@@ -418,7 +415,9 @@ ConfigureGlibc()
 			# work when cross-compiling.
 			libc_cv_forced_unwind=yes
 			libc_cv_c_cleanup=yes
-			export libc_cv_forced_unwind libc_cv_c_cleanup
+			# Added to get past ctor check with stage 1 GCC
+			libc_cv_ctors_header=yes
+			export libc_cv_forced_unwind libc_cv_c_cleanup libc_cv_ctors_header
 
 			# Setting the pre-configure options adapted from CrossTool
 			BUILD_CC=gcc CC=$TARG-gcc AR=$TARG-ar RANLIB=$TARG-ranlib ExecuteCmd "../$GLIBC/configure $GLIBCFOPTS"

@@ -19,9 +19,7 @@ PATCHBASEDIR="$BASEDIR/patches"
 # User changeable variables
 ###############################################################################
 # For the BSD people who need it to be gmake
-if [ ! "$MAKE" ]; then
-	MAKE="make"
-fi
+[ ! "$MAKE" ] && MAKE="make"
 
 # Where to send the output from make and configure
 if [ ! "$SENDTOWHERE" ]; then
@@ -46,21 +44,15 @@ else
 fi
 
 # Which thread model gcc should use
-if [ ! "$THREADS" ]; then
-	# single, posix, or yes for gcc to choose the default threading
-	THREADS="posix"
-fi
+# single, posix, or yes for gcc to choose the default threading
+[ ! "$THREADS" ] && THREADS="posix"
 
 # Some custom CFLAGS to use
-if [ "$BCCFLAGS" ]; then
-	export CFLAGS="$BCCFLAGS"
-fi
+[ "$BCCFLAGS" ] && export CFLAGS="$BCCFLAGS"
 
 # Which languages gcc should build
-if [ ! "$LANGUAGES" ]; then
-	# c, c++ are sure things, java, ada, objc
-	LANGUAGES="c,c++"
-fi
+# c, c++ are sure things, java, ada, objc
+[ ! "$LANGUAGES" ] && LANGUAGES="c,c++"
 
 # For cross-compiling... It can sure be a bitch sometimes
 if [ "$HOSTPRE" ]; then
@@ -74,9 +66,7 @@ else
 fi
 
 # We only need a single pass for the arm compiler for the Dreamcast
-if [ ! "$TWOPASS" ]; then
-	TWOPASS=0
-fi
+[ ! "$TWOPASS" ] && TWOPASS=0
 
 # Default to uClibc
 USEUCLIBC=yes
@@ -126,9 +116,7 @@ SetOptions()
 {
 	# This is here for debugging the script without clobbering the main
 	# install
-	if [ "$TESTING" ]; then
-		INSTALL="$TESTING"
-	fi
+	[ "$TESTING" ] && INSTALL="$TESTING"
 
 	# Load the default values per config
 	local filename="`echo $1.cfg | tr "[:upper:]" "[:lower:]"`"
@@ -141,21 +129,10 @@ SetOptions()
 	fi
 
 	# These are potentially unset, so make sure they're set to at least $SYSTEM/
-	if [ ! "$NEWLIBBUILD" ]; then
-		NEWLIBBUILD="$SYSTEM"
-	fi
-
-	if [ ! "$UCLIBCDIR" ]; then
-		UCLIBCDIR="$SYSTEM"
-	fi
-
-	if [ ! "$GLIBCHDIR" ]; then
-		GLIBCHDIR="$SYSTEM"
-	fi
-
-	if [ ! "$GDBBUILD" ]; then
-		GDBBUILD="$SYSTEM"
-	fi
+	[ ! "$NEWLIBBUILD" ] && NEWLIBBUILD="$SYSTEM"
+	[ ! "$UCLIBCDIR" ] && UCLIBCDIR="$SYSTEM"
+	[ ! "$GLIBCHDIR" ] && GLIBCHDIR="$SYSTEM"
+	[ ! "$GDBBUILD" ] && GDBBUILD="$SYSTEM"
 
 	BINUTILS="binutils-$BINVER"
 	GCC="gcc-$GCCVER"
@@ -195,9 +172,7 @@ SetOptions()
 	# This is normally only really needed when building a native compiler
 	# when using a cross compiler of the same name. Doesn't hurt in any
 	# case besides possibly having a longer executable name.
-	if [ "$HOSTPRE" ]; then
-		HOST="$HOST --program-prefix=$TARG-"
-	fi
+	[ "$HOSTPRE" ] && HOST="$HOST --program-prefix=$TARG-"
 	# The prefix to install for configure
 	PREFIX="--prefix=$INSTALL"
 	# Now set the options
@@ -221,16 +196,12 @@ SetOptions()
 	GDBBUILD="$SYSTEM/gdbbuild"
 
 	# If the install directory doesn't exist make it
-	if [ ! -d "$INSTALL" ]; then
-		QuietExec mkdir -p $INSTALL
-	fi
+	[ ! -d "$INSTALL" ] && QuietExec mkdir -p $INSTALL
 
 	# if HOSTPRE and TARG are the same you're bound to hit some program
 	# name collisions
-	if [ "$HOSTPRE" != "$TARG" ]; then
-		# Make sure our install/bin is in the path before our current path
-		export PATH=$INSTALL/bin:$PATH
-	fi
+	# Make sure our install/bin is in the path before our current path
+	[ "$HOSTPRE" != "$TARG" ] && export PATH=$INSTALL/bin:$PATH
 }
 
 ###############################################################################

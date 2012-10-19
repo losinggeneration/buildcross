@@ -39,9 +39,7 @@ buildcross_echo()
 		# this may be a bit too much overhead. Perhaps if it's colorized we
 		# should just check before sending -e here...
 		for i in $*; do
-			if [ "$i" != "-e" ]; then
-				local ECHO_OPTS="$ECHO_OPTS $i"
-			fi
+			[ "$i" != "-e" ] && local ECHO_OPTS="$ECHO_OPTS $i"
 		done
 		$ECHO $ECHO_OPTS
 	fi
@@ -127,9 +125,7 @@ Result()
 LogTitle()
 {
 	buildcross_echo -e "$TEXTPREFIX## $TEXTTITLE$*$TEXTRESET"
-	if [ "$SILENT" -ne 0 ]; then
-		buildcross_echo "## $*" >> $SENDTOWHERE
-	fi
+	[ "$SILENT" -ne 0 ] && buildcross_echo "## $*" >> $SENDTOWHERE
 }
 
 ###############################################################################
@@ -150,9 +146,7 @@ LogOutput()
 LogError()
 {
 	buildcross_echo -e "$TEXTPREFIX!! $TEXTERROR$*$TEXTRESET"
-	if [ "$SILENT" -ne 0 ]; then
-		buildcross_echo "!! $*" >> $ERRORTOWHERE
-	fi
+	[ "$SILENT" -ne 0 ] && buildcross_echo "!! $*" >> $ERRORTOWHERE
 }
 
 ###############################################################################
@@ -169,26 +163,11 @@ LogFatal()
 ###############################################################################
 CreateDir()
 {
-	if [ ! -d "$BINBUILD" ]; then
-		QuietExec mkdir -p "$BINBUILD"
-	fi
-
-	if [ ! -d "$GCCBUILD" ]; then
-		QuietExec mkdir -p "$GCCBUILD"
-	fi
-
-	if [ ! -d "$NEWLIBBUILD" ]; then
-		QuietExec mkdir -p "$NEWLIBBUILD"
-	fi
-
-	if [ "$TARG" = "avr" -a ! -d "$AVRLIBCBUILD" ]; then
-		QuietExec mkdir -p "$AVRLIBCBUILD"
-	fi
-
-	if [ ! -d "$GDBBUILD" ]; then
-		QuietExec mkdir -p "$GDBBUILD"
-	fi
-
+	[ ! -d "$BINBUILD" ] && QuietExec mkdir -p "$BINBUILD"
+	[ ! -d "$GCCBUILD" ] && QuietExec mkdir -p "$GCCBUILD"
+	[ ! -d "$NEWLIBBUILD" ] && QuietExec mkdir -p "$NEWLIBBUILD"
+	[ "$TARG" = "avr" -a ! -d "$AVRLIBCBUILD" ] && QuietExec mkdir -p "$AVRLIBCBUILD"
+	[ ! -d "$GDBBUILD" ] && QuietExec mkdir -p "$GDBBUILD"
 }
 
 ###############################################################################
@@ -205,9 +184,7 @@ UntarPatch()
 
 	# check if the directory for the source exists
 	# and that we got to touch that it's untared
-	if [ ! -d "$SYSTEM/$1-$2" -o ! -e "$SYSTEM/$1-$2/.untared-$2" ]; then
-		Untar $1 $2
-	fi
+	[ ! -d "$SYSTEM/$1-$2" -o ! -e "$SYSTEM/$1-$2/.untared-$2" ] && Untar $1 $2
 
 	# We send all parameters because the first is $1 and the rest
 	# are the patches, the format we want.
@@ -227,9 +204,7 @@ GccUntar()
 
 	# check if the directory for the source exists
 	# and that we got to touch that it's untared
-	if [ ! -d "$SYSTEM/$GCC" -o ! -e "$SYSTEM/$GCC/.untared-$2-$1" ]; then
-		Untar gcc $GCCVER $2
-	fi
+	[ ! -d "$SYSTEM/$GCC" -o ! -e "$SYSTEM/$GCC/.untared-$2-$1" ] && Untar gcc $GCCVER $2
 }
 
 ###############################################################################
@@ -379,9 +354,7 @@ Patch()
 	# We need to get past the name/version so shift the params two or three
 	shift 2
 
-	if [ ! "$PLEVEL" ]; then
-		PLEVEL=1
-	fi
+	[ ! "$PLEVEL" ] && PLEVEL=1
 
 	if ! CheckExists $LOC/.patched; then
 		QuietExec "cd $LOC"
@@ -446,12 +419,8 @@ CleanLocal()
 	Remove $BINBUILD
 	Remove $GCCBUILD
 	Remove $NEWLIBBUILD
-	if [ "$UCLIBCDIR" ]; then
-		Remove $UCLIBCDIR
-	fi
-	if [ "$GLIBCDIR" ]; then
-		Remove $GLIBCDIR
-	fi
+	[ "$UCLIBCDIR" ] && Remove $UCLIBCDIR
+	[ "$GLIBCDIR" ] && Remove $GLIBCDIR
 }
 
 ###############################################################################
@@ -459,9 +428,7 @@ CleanLocal()
 ###############################################################################
 CheckSystem()
 {
-	if [ ! "$SYSTEM" ]; then
-		LogFatal "You must select a system!"
-	fi
+	[ ! "$SYSTEM" ] && LogFatal "You must select a system!"
 }
 
 ###############################################################################
@@ -477,11 +444,8 @@ CheckExists()
 	# successfully return 0) or 1 (a program failing). So this function has
 	# to behave like a mini program returning 0 on success and 1 on a
 	# failure.
-	if [ -e $1 ]; then
-		# Exists, return 0
-		return 0
-	fi
-
+	# Exists, return 0
+	[ -e $1 ] && return 0
 	# Doesn't exist, return 1
 	return 1
 }

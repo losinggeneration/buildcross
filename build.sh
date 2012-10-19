@@ -49,9 +49,7 @@ BuildBin()
 		ExecuteCmd "$MAKE all"
 
 		ExecuteCmd "$MAKE install" "Building Binutils"
-		if [ "$SHELF" ]; then
-			ExecuteCmd "$MAKE install-bfd" "Install libbfd"
-		fi
+		[ "$SHELF" ] && ExecuteCmd "$MAKE install-bfd" "Install libbfd"
 
 		QuietExec "touch .installed"
 	else
@@ -169,9 +167,7 @@ BuildNewlib()
 		if [ "$USEKOS" ]; then
 			if [ "$THREADS" = "posix" -o "$THREADS" = "yes" -o "$THREADS" = "kos" ]; then
 				local CPLN="cp -r"
-				if [ "$USELN" ]; then
-					CPLN="ln -nsf"
-				fi
+				[ "$USELN" ] && CPLN="ln -nsf"
 
 				# Make sure KOS is downloaded before trying to copy files from
 				# it

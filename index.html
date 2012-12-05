@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Buildcross by losinggeneration</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Buildcross</h1>
+        <p>A set of scripts to build various toolchains for bare hardware and also Linux based.</p>
+
+        <p class="view"><a href="https://github.com/losinggeneration/buildcross">View the Project on GitHub <small>losinggeneration/buildcross</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/losinggeneration/buildcross/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/losinggeneration/buildcross/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/losinggeneration/buildcross">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <p>This project is to assist in building various cross compilers:
+Fully supported cross compilers are that should build and work correctly:</p>
+
+<ul>
+<li>Dreamcast (sh-elf and arm-elf for KOS)</li>
+<li>Dreamcast Linux (sh4-linux-uclibc or sh4-linux-gnu)</li>
+<li>Gamecube (builds pretty much the same compiler as devkitpro)</li>
+<li>Gamecube Linux (powerpc-gekko-linux-uclibc or powerpc-gekko-linux-gnu)</li>
+</ul><p>Others that may or maynot work:</p>
+
+<ul>
+<li>Genesis</li>
+<li>Saturn</li>
+<li>ArchLinux PPC</li>
+<li>Arm Linux</li>
+<li>GBA</li>
+<li>Ix86</li>
+</ul><p>Usage:
+The help should give most of the info needed to get started
+./buildcross.sh -h
+And this will give even more info and examples
+./buildcross -e</p>
+
+<p>Some highlights:
+Build the Dreamcast compiler:
+./buildcross.sh -dc
+Build the Gamecube compiler:
+./buildcross.sh gamecube -all
+Build a Dreamcast Linux compiler with glibc:
+./buildcross.sh -dcl
+Build a Dreamcast Linux compiler with uclibc:
+./buildcross.sh -u -dcl</p>
+
+<p>Same as above but using the system name
+Build a Dreamcast Linux compiler with glibc:
+./buildcross.sh dclinux -bl
+Build a Dreamcast Linux compiler with uclibc:
+./buildcross.sh -u dclinux -dcl</p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/losinggeneration">losinggeneration</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>

@@ -649,10 +649,9 @@ DependsCLibraryResult() {
 	# I'd actually have preferred to use this style:
 	# gcc -pipe -xc -c -o /dev/null <(echo "#include <$1>") &>/dev/null
 	# Unfortunately, I don't think this is as portable as what I have below.
-	(cat << EOF
+	cat << EOF | gcc -pipe -xc -c -o /dev/null - 2> /dev/null
 		#include <$1>
 EOF
-	) | gcc -pipe -xc -c -o /dev/null - &> /dev/null
 
 	if [ $? -eq 0 ]; then
 		# don't mess up logging

@@ -244,3 +244,4 @@ Version 1.9:
 	-Bumped Saturn versions: GCC 4.7.1, Binutils 2.22, NewLib 1.20.0, GDB 7.4.
 	-Updated Saturn build flags to better represent building a compiler to use
 	 without using illegal libraries from the SDK.
+	-Added MSP430 as a target: GCC 4.7.0, Binutils 2.22, GDB 7.2a.

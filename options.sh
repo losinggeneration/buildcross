@@ -159,7 +159,7 @@ SetOptions()
 	# uClibc patches
 	UCLIBCPATCH=$PATCHDIR/$UCLIBC-*
 	AVRLIBCPATCH=$PATCHDIR/$AVRLIBC-*
-	GDBPATCH=$PATHCDIR/$GDB-*
+	GDBPATCH=$PATCHDIR/$GDB-*
 
 	# Now we can setup everything else by the variables defined above
 	#################################################################

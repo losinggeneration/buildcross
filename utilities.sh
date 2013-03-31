@@ -578,7 +578,7 @@ CheckDeps()
 	# If any aren't found, we need to tell the user
 	if [ "$NOTFOUND" != "" ]; then
 		# Replace the ", " with a \n to make it go to a new line
-		NOTFOUND=$(echo "$NOTFOUND" | sed "s/, /\n/g")
+		NOTFOUND=$(echo "$NOTFOUND" | sed "s/, /\\\n/g")
 		# Make sure we log it correctly. We don't want color in the log
 		if [ "$SILENT" -eq 0 ]; then
 			LogOutput "The following dependencies were not found: $TEXTERROR$NOTFOUND$TEXTRESET"
@@ -599,7 +599,7 @@ DependsResult()
 {
 	# First check to see if it's in the current path (if not it might be
 	# builtin
-	if [ "$(which $1)" ]; then
+	if [ "$(command -v $1)" ]; then
 		if [ "$SILENT" -eq 0 ]; then
 			LogOutput "$1: $TEXTFOUND"
 		else
@@ -609,34 +609,43 @@ DependsResult()
 		return 0
 	fi
 
+	if [ "$(uname -s)" = "Linux" ]; then
+		# We don't want to use ExecuteCmd since that'll leave the script on
+		# errors
+		# Add --help so we at least know it won't go into a loop
+		$1 --help &> .tempdep
 
-	# We don't want to use ExecuteCmd since that'll leave the script on
-	# errors
-	# Add --help so we at least know it won't go into a loop
-	$1 --help &> .tempdep
-
-	# If the command was successful, we're doing well
-	if [ $? -eq 0 ]; then
-		# Strip the " --help" from the command line
-		local COMMAND=$(echo $1 | sed "s/ --help//")
-		# Again, don't mess up logging
-		if [ "$SILENT" -eq 0 ]; then
-			LogOutput "$COMMAND: $TEXTFOUND"
+		# If the command was successful, we're doing well
+		if [ $? -eq 0 ]; then
+			# Strip the " --help" from the command line
+			local COMMAND=$(echo $1 | sed "s/ --help//")
+			# Again, don't mess up logging
+			if [ "$SILENT" -eq 0 ]; then
+				LogOutput "$COMMAND: $TEXTFOUND"
+			else
+				LogOutput "$COMMAND: [FOUND]"
+			fi
+			# Remove the temporary output/error file
+			QuietExec "rm .tempdep"
+			# return success
+			return 0
 		else
-			LogOutput "$COMMAND: [FOUND]"
+			local COMMAND=$(echo $1 | sed "s/ --help//")
+			if [ "$SILENT" -eq 0 ]; then
+				LogError "$COMMAND: $TEXTNOTFOUND"
+			else
+				LogError "$COMMAND: [NOT FOUND]"
+			fi
+			QuietExec "rm .tempdep"
+			return 1
 		fi
-		# Remove the temporary output/error file
-		QuietExec "rm .tempdep"
-		# return success
-		return 0
 	else
-		local COMMAND=$(echo $1 | sed "s/ --help//")
+		# We don't try as hard if it's not Linux...
 		if [ "$SILENT" -eq 0 ]; then
-			LogError "$COMMAND: $TEXTNOTFOUND"
+			LogError "$1: $TEXTNOTFOUND"
 		else
-			LogError "$COMMAND: [NOT FOUND]"
+			LogError "$1: [NOT FOUND]"
 		fi
-		QuietExec "rm .tempdep"
 		return 1
 	fi
 }

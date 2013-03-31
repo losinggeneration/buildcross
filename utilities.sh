@@ -655,10 +655,13 @@ DependsResult()
 # Print dependency check for a C library
 ###############################################################################
 DependsCLibraryResult() {
+	# NetBSD should likely use the pkgsrc include path
+	[ "$(uname -s)" = "NetBSD" ] && local DEPCFLAGS="-I/usr/pkg/include"
+
 	# I'd actually have preferred to use this style:
 	# gcc -pipe -xc -c -o /dev/null <(echo "#include <$1>") &>/dev/null
 	# Unfortunately, I don't think this is as portable as what I have below.
-	cat << EOF | gcc -pipe -xc -c -o /dev/null - 2> /dev/null
+	cat << EOF | gcc -pipe -xc -c $DEPCFLAGS -o /dev/null - 2> /dev/null
 		#include <$1>
 EOF
 

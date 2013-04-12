@@ -222,6 +222,10 @@ Version 1.8:
 Version 1.8.1:
 	-Remove a bad option passed to Dreamcast's newlib
 
+Version 1.8.2:
+	-Update KOS & ports to new Sourceforge git url.
+	-Fixed bug in GDB patching.
+
 Version 1.9:
 	-Gcc 4.7.0 removed per-language tarballs, so we're using the single
 	 tarball across the board now.
@@ -245,3 +249,7 @@ Version 1.9:
 	-Updated Saturn build flags to better represent building a compiler to use
 	 without using illegal libraries from the SDK.
 	-Added MSP430 as a target: GCC 4.7.0, Binutils 2.22, GDB 7.2a.
+	-Added Z80 as a target: Binutils only.
+	-Updated template to have SYSTEM option.
+	-Fix bug in GDB patching.
+	-Update KOS & ports to new Sourceforge git url.

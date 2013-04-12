@@ -221,3 +221,10 @@ Version 1.8:
 
 Version 1.8.1:
 	-Remove a bad option passed to Dreamcast's newlib
+
+Version 1.8.2:
+	-Update KOS & ports to new Sourceforge git url.
+	-Change the KOS & ports .downloaded path to be inside kos & kos ports
+	 respectively
+	-Fixed bug in GDB patching.
+

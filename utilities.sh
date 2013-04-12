@@ -327,13 +327,13 @@ Download()
 		"kos")
 			if ! CheckExists $KOSLOCATION/.kos-downloaded || ! test -d $KOSLOCATION; then
 				QuietExec "cd $KOSLOCATION/.."
-				ExecuteCmd "svn co https://cadcdev.svn.sourceforge.net/svnroot/cadcdev/kos"
-				QuietExec "touch .kos-downloaded"
+				ExecuteCmd "git clone git://git.code.sf.net/p/cadcdev/kallistios kos"
+				QuietExec "touch $KOSLOCATION/.kos-downloaded"
 			fi
 			if ! CheckExists $KOSLOCATION/../kos-ports/.kos-ports-downloaded || ! test -d $KOSLOCATION/../kos-ports; then
 				QuietExec "cd $KOSLOCATION/.."
-				ExecuteCmd "svn co https://cadcdev.svn.sourceforge.net/svnroot/cadcdev/kos-ports"
-				QuietExec "touch .kos-ports-downloaded"
+				ExecuteCmd "git clone --recursive git://git.code.sf.net/p/cadcdev/kos-ports"
+				QuietExec "touch $KOSLOCATION/../kos-ports/.kos-ports-downloaded"
 			fi
 			QuietExec "cd $BASEDIR"
 			;;

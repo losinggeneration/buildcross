@@ -254,3 +254,5 @@ Version 1.9:
 	-Fix bug in GDB patching.
 	-Update KOS & ports to new Sourceforge git url.
 	-Update Dreamcast versions for KOS 2.0.0.
+	-Updated newlib url.
+	-Use $() instead of `` in a couple places in utilities.sh

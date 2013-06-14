@@ -12,7 +12,7 @@
 check_echo()
 {
 	# check if echo supports -e
-	if [ "`echo -e`" = "-e" ]; then
+	if [ "$(echo -e)" = "-e" ]; then
 		# if not, see if /bin/echo is there, it might
 		if [ -x /bin/echo ]; then
 			ECHO="/bin/echo"
@@ -24,7 +24,7 @@ check_echo()
 	fi
 
 	# if we don't have -e, remove colors to play it safe
-	if [ "`$ECHO -e`" = "-e" ]; then
+	if [ "$($ECHO -e)" = "-e" ]; then
 		RemoveColorize
 	else
 		Colorize
@@ -266,7 +266,7 @@ Download()
 			;;
 		"newlib")
 			if ! CheckExists .$NEWLIB-downloaded || ! CheckExists $NEWLIB.tar.gz; then
-				ExecuteCmd "wget -c ftp://sources.redhat.com/pub/newlib/$NEWLIB.tar.gz"
+				ExecuteCmd "wget -c ftp://sourceware.org/pub/newlib/$NEWLIB.tar.gz"
 				QuietExec "touch .$NEWLIB-downloaded"
 			fi
 			;;
@@ -362,8 +362,8 @@ Patch()
 		# $(ls patches/sys/namever-*)
 		for i in $*; do
 			# Only patch if the "if" includes a *.patch or a *.diff
-			if [ "`echo $i | grep -i '\.patch' | grep -v DISABLED`" -o \
-					"`echo $i | grep -i '\.diff' | grep -v DISABLED`" ]; then
+			if [ "$(echo $i | grep -i '\.patch' | grep -v DISABLED)" -o \
+					"$(echo $i | grep -i '\.diff' | grep -v DISABLED)" ]; then
 				ExecuteCmd "patch -p$PLEVEL -i $i"
 			fi
 		done

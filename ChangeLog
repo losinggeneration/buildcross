@@ -253,3 +253,4 @@ Version 1.9:
 	-Updated template to have SYSTEM option.
 	-Fix bug in GDB patching.
 	-Update KOS & ports to new Sourceforge git url.
+	-Update Dreamcast versions for KOS 2.0.0.

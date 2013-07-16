@@ -260,6 +260,7 @@ ConfigureKernelHeaders()
 {
 	# this if statemest probably isn't needed
 	if [ "$USEUCLIBC" ]; then
+		UntarPatch $KERNELNAME $KERNELVER $KERNELPATCH
 		QuietExec "cd $SYSTEM/$KERNEL"
 
 		if [ $(echo $KERNEL | grep libc) ]; then

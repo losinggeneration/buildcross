@@ -563,6 +563,10 @@ ParseArgs()
 			USELN=yes
 			return 0
 			;;
+		"-gc")
+			BuildGamecube
+			return 0
+			;;
 		"-dcl")
 			BuildLinux DcLinux
 			return 0

@@ -836,3 +836,18 @@ BuildLinux()
 	QuietExec "rm -fr $INSTALL/$TARG/sys-include"
 }
 
+###############################################################################
+# Build Gamecube compiler
+###############################################################################
+BuildGamecube()
+{
+	# Make sure we're in the right target
+	SetOptions Gamecube
+
+	All
+
+	SetOptions GcMN10200
+	LogTitle "Making MN10200 Binutils for Gamecube"
+	ConfigureBin
+	BuildBin
+}

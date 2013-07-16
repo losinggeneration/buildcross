@@ -257,3 +257,5 @@ Version 1.9:
 	-Updated newlib url.
 	-Use $() instead of `` in a couple places in utilities.sh
 	-Bumped Gamecube versions: Gcc 4.7.2, BinUtils 2.23.1, GDB 7.5.1, Newlib 1.20
+	-Added -gc command to build Gamecube compiler.
+	-Fixed possible issue when configuring kernel headers (and not untaring.)

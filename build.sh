@@ -864,6 +864,7 @@ InstallGamecubeTools()
 	fi
 	cd libogc
 	DEVKITPPC=$INSTALL ExecuteCmd "make"
+	DEVKITPPC=$INSTALL ExecuteCmd "make install-headers"
 	cd $BASEDIR
 }
 

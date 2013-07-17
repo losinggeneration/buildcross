@@ -837,6 +837,36 @@ BuildLinux()
 	QuietExec "rm -fr $INSTALL/$TARG/sys-include"
 }
 
+InstallGamecubeRules()
+{
+	cp $PATCHDIR/rules/*_rules $INSTALL/
+	cp $PATCHDIR/crtls/*.ld $INSTALL/$TARG/lib/
+}
+
+InstallGamecubeTools()
+{
+	QuietExec "cd $BASEDIR/$SYSTEM"
+	# native tools
+	for tool in elf2dol gxtexconv; do
+		if [ ! -d $tool/.git ]; then
+			ExecuteCmd "git clone git://git.code.sf.net/p/devkitpro/$tool"
+		fi
+		QuietExec "cd $tool"
+		ExecuteCmd "./autogen.sh"
+		ExecuteCmd "./configure --prefix=$INSTALL"
+		ExecuteCmd "make install"
+		QuietExec "cd -"
+	done
+
+	cd $INSTALL
+	if [ ! -d libogc/.git ]; then
+		git clone git://git.code.sf.net/p/devkitpro/libogc
+	fi
+	cd libogc
+	DEVKITPPC=$INSTALL ExecuteCmd "make"
+	cd $BASEDIR
+}
+
 ###############################################################################
 # Build Gamecube compiler
 ###############################################################################
@@ -844,11 +874,15 @@ BuildGamecube()
 {
 	# Make sure we're in the right target
 	SetOptions Gamecube
-
 	All
 
 	SetOptions GcMN10200
 	LogTitle "Making MN10200 Binutils for Gamecube"
 	ConfigureBin
 	BuildBin
+
+	# Reset some options for Gamecube
+	SetOptions Gamecube
+	InstallGamecubeRules
+	InstallGamecubeTools
 }

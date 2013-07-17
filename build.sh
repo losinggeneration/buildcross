@@ -847,7 +847,7 @@ InstallGamecubeTools()
 {
 	QuietExec "cd $BASEDIR/$SYSTEM"
 	# native tools
-	for tool in elf2dol gxtexconv; do
+	for tool in elf2dol gxtexconv general-tools; do
 		if [ ! -d $tool/.git ]; then
 			ExecuteCmd "git clone git://git.code.sf.net/p/devkitpro/$tool"
 		fi

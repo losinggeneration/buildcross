@@ -1,8 +1,20 @@
-diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
---- gcc-4.5.2/gcc/config/sh/crt1.asm	2009-04-09 11:00:19.000000000 -0400
-+++ gcc-4.5.2-kos/gcc/config/sh/crt1.asm	2012-06-11 14:51:34.000000000 -0400
-@@ -1,1369 +1,197 @@
--/* Copyright (C) 2000, 2001, 2003, 2004, 2005, 2006, 2009
+diff -ruN gcc-4.7.3/gcc/configure gcc-4.7.3-kos/gcc/configure
+--- gcc-4.7.3/gcc/configure	2013-02-06 10:23:55.000000000 -0500
++++ gcc-4.7.3-kos/gcc/configure	2013-05-17 21:30:40.000000000 -0400
+@@ -11338,7 +11338,7 @@
+     target_thread_file='single'
+     ;;
+   aix | dce | lynx | mipssde | posix | rtems | \
+-  single | tpf | vxworks | win32)
++  single | tpf | vxworks | win32 | kos)
+     target_thread_file=${enable_threads}
+     ;;
+   *)
+diff -ruN gcc-4.7.3/libgcc/config/sh/crt1.S gcc-4.7.3-kos/libgcc/config/sh/crt1.S
+--- gcc-4.7.3/libgcc/config/sh/crt1.S	2011-11-02 10:33:56.000000000 -0400
++++ gcc-4.7.3-kos/libgcc/config/sh/crt1.S	2013-05-17 21:34:42.000000000 -0400
+@@ -1,1369 +1,202 @@
+-/* Copyright (C) 2000, 2001, 2003, 2004, 2005, 2006, 2009, 2011
 -   Free Software Foundation, Inc.
 -   This file was pretty much copied from newlib.
 +! KallistiOS ##version##
@@ -58,7 +70,7 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
 -#endif /* MMU_SUPPORT */
 -	
 -	/* ;----------------------------------------
--	Normal newlib crt1.asm */
+-	Normal newlib crt1.S */
 -
 -#ifdef __SH5__
 -	.section .data,"aw"
@@ -859,6 +871,8 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
  
 -	! call init
 -	mov.l	init_k,r0
+-	jsr	@r0
+-	nop
 +	! Save the current stack, and set a new stack (higher up in RAM)
 +	mov.l	old_stack_addr,r0
 +	mov.l	r15,@r0
@@ -868,7 +882,10 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
 +	mov.l	old_vbr_addr,r0
 +	stc	vbr,r1
 +	mov.l	r1,@r0
-+
+ 
+-	! call the mainline	
+-	mov.l	main_k,r0
++#if defined (__SH_FPU_ANY__)
 +	! Save FPSCR
 +	mov.l	old_fpscr_addr,r0
 +	sts	fpscr,r1
@@ -880,22 +897,13 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
  	jsr	@r0
 -	nop
 +	shll16	r4
- 
--	! call the mainline	
--	mov.l	main_k,r0
--	jsr	@r0
--	nop
-+	! Setup a sentinel value for frame pointer in case we're using
-+	! FRAME_POINTERS for stack tracing.
-+	mov	#-1,r14
++#endif
  
 -	! call exit
 -	mov	r0,r4
 -	mov.l	exit_k,r0
-+	! Jump to the kernel main
-+	mov.l	main_addr,r0
- 	jsr	@r0
- 	nop
+-	jsr	@r0
+-	nop
 -	
 -		.balign 4
 -#ifdef PROFILE
@@ -904,11 +912,17 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
 -	mov.l	profiling_enabled_k2, r0
 -	mov	#0, r1
 -	mov.l	r1, @r0
--
++	! Setup a sentinel value for frame pointer in case we're using
++	! FRAME_POINTERS for stack tracing.
++	mov	#-1,r14
+ 
 -	# call mcleanup
 -	mov.l	mcleanup_k, r0
 -	jmp	@r0
--	nop
++	! Jump to the kernel main
++	mov.l	main_addr,r0
++	jsr	@r0
+ 	nop
 -		
 -		.balign 4
 -mcleanup_k:
@@ -922,37 +936,12 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
 -etext_k:
 -	.long __etext
 -#endif /* PROFILE */
- 
+-
 -	.align 2
 -#if defined (__SH_FPU_ANY__)
 -set_fpscr_k:
 -	.long	___set_fpscr
 -#endif /*  defined (__SH_FPU_ANY__) */
-+	! Program can return here (not likely) or jump here directly
-+	! from anywhere in it to go straight back to the monitor
-+_arch_real_exit:
-+	! Reset SR
-+	mov.l	old_sr,r0
-+	ldc	r0,sr
-+
-+	! Disable MMU, invalidate TLB
-+	mov	#4,r0
-+	mov.l	mmu_addr,r1
-+	mov.l	r0,@r1
-+
-+	! Wait (just in case)
-+	nop				! 1
-+	nop				! 2
-+	nop				! 3
-+	nop				! 4
-+	nop				! 5
-+	nop				! 6
-+	nop				! 7
-+	nop				! 8
-+	
-+	! Restore VBR
-+	mov.l	old_vbr,r0
-+	ldc	r0,vbr
  
 -stack_k:
 -	.long	_stack	
@@ -982,7 +971,32 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
 -	! Whether profiling or not, keep interrupts masked,
 -	! the RTOS will enable these if required.
 -	.long 0x600000f1 
--
++	! Program can return here (not likely) or jump here directly
++	! from anywhere in it to go straight back to the monitor
++_arch_real_exit:
++	! Reset SR
++	mov.l	old_sr,r0
++	ldc	r0,sr
++
++	! Disable MMU, invalidate TLB
++	mov	#4,r0
++	mov.l	mmu_addr,r1
++	mov.l	r0,@r1
++
++	! Wait (just in case)
++	nop				! 1
++	nop				! 2
++	nop				! 3
++	nop				! 4
++	nop				! 5
++	nop				! 6
++	nop				! 7
++	nop				! 8
++	
++	! Restore VBR
++	mov.l	old_vbr,r0
++	ldc	r0,vbr
+ 
 -rtos_start_fn:
 -	.long ___rtos_profiler_start_timer
 -	
@@ -1060,7 +1074,7 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
 -	mov.l	r6,@-r15
 -	mov.l	r7,@-r15
 -	sts.l	pr,@-r15
--
+ 
 -	! r4 is frompc.
 -	! r5 is selfpc
 -	! r0 is the branch back address.
@@ -1130,7 +1144,7 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
 -	.balign 4
 -2:	
 -	.long old_vbr
- 
+-
 -	.org 0x400
 -vbr_400:	! Should be at vbr+0x400
 -	mov.l 2f, r0     ! load the old vbr setting (if any)
@@ -1173,7 +1187,57 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
 -	! jmp to trap handler to avoid disturbing pr. 
 -	jmp @r2
 -	nop
--
++! Misc variables
++	.align	2
++dcload_magic_addr:
++	.long	0x8c004004
++dcload_magic_value:
++	.long	0xdeadbeef
++dcload_syscall:
++	.long	0x8c004008
++__arch_old_sr:
++old_sr:
++	.long	0
++__arch_old_vbr:
++old_vbr:
++	.long	0
++__arch_old_fpscr:
++old_fpscr:
++	.long	0
++init_sr:
++	.long	0x500000f0
++old_sr_addr:
++	.long	old_sr
++old_vbr_addr:
++	.long	old_vbr
++old_fpscr_addr:
++	.long	old_fpscr
++old_stack_addr:
++	.long	old_stack
++__arch_old_stack:
++old_stack:
++	.long	0
++new_stack:
++	.long	0x8d000000
++p2_mask:
++	.long	0xa0000000
++setup_cache_addr:
++	.long	setup_cache
++init_addr:
++	.long	init
++main_addr:
++	.long	_arch_main
++mmu_addr:
++	.long	0xff000010
++kos_init_flags_addr:
++	.long	___kos_init_flags
++ccr_addr:
++	.long	0xff00001c
++ccr_data:
++	.word	0x090d
++ccr_data_ocram:
++	.word	0x092d
+ 
 -	.org 0x600
 -vbr_600:
 -#ifdef PROFILE	
@@ -1289,7 +1353,10 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
 -	.long __timer_stack	! The high end of the stack
 -timer_handler_k:
 -	.long __profil_counter
--#endif
++#if defined (__SH_FPU_ANY__)
++fpscr_addr:
++	.long	___set_fpscr	! in libgcc
+ #endif
 -expevt_k:
 -	.long 0xff000024 ! Address of expevt
 -chandler_k:	
@@ -1497,73 +1564,89 @@ diff -ruN gcc-4.5.2/gcc/config/sh/crt1.asm gcc-4.5.2-kos/gcc/config/sh/crt1.asm
 -	.ualong	0x0
 -#endif /* VBR_SETUP */
 -#endif /* ! __SH5__ */
-+! Misc variables
-+	.align	2
-+dcload_magic_addr:
-+	.long	0x8c004004
-+dcload_magic_value:
-+	.long	0xdeadbeef
-+dcload_syscall:
-+	.long	0x8c004008
-+__arch_old_sr:
-+old_sr:
-+	.long	0
-+__arch_old_vbr:
-+old_vbr:
-+	.long	0
-+__arch_old_fpscr:
-+old_fpscr:
-+	.long	0
-+init_sr:
-+	.long	0x500000f0
-+old_sr_addr:
-+	.long	old_sr
-+old_vbr_addr:
-+	.long	old_vbr
-+old_fpscr_addr:
-+	.long	old_fpscr
-+old_stack_addr:
-+	.long	old_stack
-+__arch_old_stack:
-+old_stack:
-+	.long	0
-+new_stack:
-+	.long	0x8d000000
-+p2_mask:
-+	.long	0xa0000000
-+setup_cache_addr:
-+	.long	setup_cache
-+init_addr:
-+	.long	init
-+main_addr:
-+	.long	_arch_main
-+mmu_addr:
-+	.long	0xff000010
-+fpscr_addr:
-+	.long	___set_fpscr	! in libgcc
-+kos_init_flags_addr:
-+	.long	___kos_init_flags
-+ccr_addr:
-+	.long	0xff00001c
-+ccr_data:
-+	.word	0x090d
-+ccr_data_ocram:
-+	.word	0x092d
-diff -ruN gcc-4.5.2/gcc/configure gcc-4.5.2-kos/gcc/configure
---- gcc-4.5.2/gcc/configure	2010-12-03 07:35:37.000000000 -0500
-+++ gcc-4.5.2-kos/gcc/configure	2012-06-11 14:51:34.000000000 -0400
-@@ -10421,7 +10421,7 @@
-     target_thread_file='single'
-     ;;
-   aix | dce | gnat | irix | posix | posix95 | rtems | \
--  single | solaris | vxworks | win32 | mipssde)
-+  single | solaris | vxworks | win32 | mipssde | kos)
-     target_thread_file=${enable_threads}
-     ;;
-   *)
-diff -ruN gcc-4.5.2/gcc/gthr-kos.h gcc-4.5.2-kos/gcc/gthr-kos.h
---- gcc-4.5.2/gcc/gthr-kos.h	1969-12-31 19:00:00.000000000 -0500
-+++ gcc-4.5.2-kos/gcc/gthr-kos.h	2012-06-11 20:22:12.000000000 -0400
+diff -ruN gcc-4.7.3/libgcc/config/sh/fake-kos.S gcc-4.7.3-kos/libgcc/config/sh/fake-kos.S
+--- gcc-4.7.3/libgcc/config/sh/fake-kos.S	1969-12-31 19:00:00.000000000 -0500
++++ gcc-4.7.3-kos/libgcc/config/sh/fake-kos.S	2013-05-17 21:34:42.000000000 -0400
+@@ -0,0 +1,75 @@
++! Weakly linked symbols used to get GCC to hopefully compile itself properly.
++! These will be replaced by the real symbols in actual compiled programs.
++
++    ! crt1.S required symbols
++    .weak   ___kos_init_flags
++    .weak   _arch_main
++
++    ! gthr-kos.h required symbols
++    .weak   _mutex_is_locked
++    .weak   _mutex_destroy
++    .weak   _mutex_lock
++    .weak   _mutex_trylock
++    .weak   _mutex_lock_timed
++    .weak   _mutex_unlock
++
++    .weak   _thd_create
++    .weak   _thd_join
++    .weak   _thd_detach
++    .weak   _thd_pass
++    .weak   _thd_exit
++    .weak   _thd_get_current
++
++    .weak   _kthread_setspecific
++    .weak   _kthread_getspecific
++    .weak   _kthread_key_create
++    .weak   _kthread_key_delete
++    .weak   _kthread_once
++
++    .weak   _cond_destroy
++    .weak   _cond_wait
++    .weak   _cond_wait_timed
++    .weak   _cond_broadcast
++    .weak   _cond_signal
++
++    ! Things needed by emutls
++    .weak   _free
++    .weak   _abort
++    .weak   _malloc
++    .weak   _realloc
++    .weak   _calloc
++
++___kos_init_flags:
++    .long   0
++
++_arch_main:
++_mutex_is_locked:
++_mutex_unlock:
++_mutex_destroy:
++_mutex_lock:
++_mutex_trylock:
++_mutex_lock_timed:
++_thd_create:
++_thd_join:
++_thd_detach:
++_thd_pass:
++_thd_exit:
++_thd_get_current:
++_kthread_setspecific:
++_kthread_getspecific:
++_kthread_key_create:
++_kthread_key_delete:
++_kthread_once:
++_cond_destroy:
++_cond_wait:
++_cond_wait_timed:
++_cond_broadcast:
++_cond_signal:
++_free:
++_abort:
++_malloc:
++_realloc:
++_calloc:
++    rts
++    mov     #-1, r0
++    
+\ No newline at end of file
+diff -ruN gcc-4.7.3/libgcc/config/sh/gthr-kos.h gcc-4.7.3-kos/libgcc/config/sh/gthr-kos.h
+--- gcc-4.7.3/libgcc/config/sh/gthr-kos.h	1969-12-31 19:00:00.000000000 -0500
++++ gcc-4.7.3-kos/libgcc/config/sh/gthr-kos.h	2013-05-17 21:36:10.000000000 -0400
 @@ -0,0 +1,355 @@
 +/* Copyright (C) 2009, 2010, 2011, 2012 Lawrence Sebald */
 +
@@ -1624,7 +1707,7 @@ diff -ruN gcc-4.5.2/gcc/gthr-kos.h gcc-4.5.2-kos/gcc/gthr-kos.h
 +#define __GTHREAD_COND_INIT COND_INITIALIZER
 +
 +static inline int __gthread_active_p(void) {
-+  return 1;
++    return 1;
 +}
 +
 +#ifdef _LIBOBJC
@@ -1920,15 +2003,26 @@ diff -ruN gcc-4.5.2/gcc/gthr-kos.h gcc-4.5.2-kos/gcc/gthr-kos.h
 +#endif /* _LIBOBJC */
 +
 +#endif /* ! GCC_GTHR_KOS_H */
-diff -ruN gcc-4.5.2/libiberty/strsignal.c gcc-4.5.2-kos/libiberty/strsignal.c
---- gcc-4.5.2/libiberty/strsignal.c	2008-06-19 11:08:53.000000000 -0400
-+++ gcc-4.5.2-kos/libiberty/strsignal.c	2012-06-11 15:14:49.000000000 -0400
-@@ -551,7 +551,7 @@
- #ifndef HAVE_PSIGNAL
+diff -ruN gcc-4.7.3/libgcc/config/sh/t-sh gcc-4.7.3-kos/libgcc/config/sh/t-sh
+--- gcc-4.7.3/libgcc/config/sh/t-sh	2011-11-07 12:14:32.000000000 -0500
++++ gcc-4.7.3-kos/libgcc/config/sh/t-sh	2013-05-17 21:33:11.000000000 -0400
+@@ -24,6 +24,8 @@
+   $(LIB1ASMFUNCS_CACHE)
+ LIB1ASMFUNCS_CACHE = _ic_invalidate _ic_invalidate_array
  
- void
--psignal (int signo, char *message)
-+psignal (int signo, const char *message)
- {
-   if (signal_names == NULL)
-     {
++LIB2ADD = $(srcdir)/config/sh/fake-kos.S
++
+ crt1.o: $(srcdir)/config/sh/crt1.S
+ 	$(gcc_compile) -c $<
+ 
+diff -ruN gcc-4.7.3/libgcc/configure gcc-4.7.3-kos/libgcc/configure
+--- gcc-4.7.3/libgcc/configure	2012-08-06 10:34:27.000000000 -0400
++++ gcc-4.7.3-kos/libgcc/configure	2013-05-17 21:32:08.000000000 -0400
+@@ -4480,6 +4480,7 @@
+     tpf)	thread_header=config/s390/gthr-tpf.h ;;
+     vxworks)	thread_header=config/gthr-vxworks.h ;;
+     win32)	thread_header=config/i386/gthr-win32.h ;;
++    kos)	thread_header=config/sh/gthr-kos.h ;;
+ esac
+ 
+ # Substitute configuration variables

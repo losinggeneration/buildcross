@@ -1,17 +1,17 @@
-diff -ruN newlib-1.19.0-orig/newlib/configure.host newlib-1.19.0/newlib/configure.host
---- newlib-1.19.0-orig/newlib/configure.host	2010-12-02 14:30:46.000000000 -0500
-+++ newlib-1.19.0/newlib/configure.host	2011-01-08 00:28:36.000000000 -0500
-@@ -234,6 +234,7 @@
+diff -ruN newlib-2.0.0/newlib/configure.host newlib-2.0.0-kos/newlib/configure.host
+--- newlib-2.0.0/newlib/configure.host	2012-12-04 16:43:20.000000000 -0500
++++ newlib-2.0.0-kos/newlib/configure.host	2013-05-18 00:16:34.000000000 -0400
+@@ -245,6 +245,7 @@
  	;;
    sh | sh64)
  	machine_dir=sh
-+	newlib_cflags="${newlib_cflags} -DREENTRANT_SYSCALLS_PROVIDED -DMALLOC_PROVIDED -DABORT_PROVIDED -fno-crossjumping -fno-optimize-sibling-calls"
++	newlib_cflags="${newlib_cflags} -DREENTRANT_SYSCALLS_PROVIDED -DMALLOC_PROVIDED -DABORT_PROVIDED -DHAVE_FCNTL -ffunction-sections -fdata-sections"
  	;;
    sparc*)
  	machine_dir=sparc
-diff -ruN newlib-1.19.0-orig/newlib/libc/include/assert.h newlib-1.19.0/newlib/libc/include/assert.h
---- newlib-1.19.0-orig/newlib/libc/include/assert.h	2008-07-17 16:56:51.000000000 -0400
-+++ newlib-1.19.0/newlib/libc/include/assert.h	2011-01-08 01:26:09.000000000 -0500
+diff -ruN newlib-2.0.0/newlib/libc/include/assert.h newlib-2.0.0-kos/newlib/libc/include/assert.h
+--- newlib-2.0.0/newlib/libc/include/assert.h	2012-10-16 15:00:30.000000000 -0400
++++ newlib-2.0.0-kos/newlib/libc/include/assert.h	2013-05-18 00:17:28.000000000 -0400
 @@ -13,8 +13,8 @@
  #ifdef NDEBUG           /* required by ANSI standard */
  # define assert(__e) ((void)0)
@@ -34,12 +34,24 @@ diff -ruN newlib-1.19.0-orig/newlib/libc/include/assert.h newlib-1.19.0/newlib/l
 +void _EXFUN(__assert, (const char *, int, const char *, const char *,
 +                       const char *) _ATTRIBUTE ((__noreturn__)));
  
- #ifdef __cplusplus
- }
-diff -ruN newlib-1.19.0-orig/newlib/libc/include/sys/types.h newlib-1.19.0/newlib/libc/include/sys/types.h
---- newlib-1.19.0-orig/newlib/libc/include/sys/types.h	2010-12-08 09:44:06.000000000 -0500
-+++ newlib-1.19.0/newlib/libc/include/sys/types.h	2011-01-08 00:10:45.000000000 -0500
-@@ -282,7 +282,7 @@
+ #if __STDC_VERSION__ >= 201112L && !defined __cplusplus
+ # define static_assert _Static_assert
+diff -ruN newlib-2.0.0/newlib/libc/include/machine/_default_types.h newlib-2.0.0-kos/newlib/libc/include/machine/_default_types.h
+--- newlib-2.0.0/newlib/libc/include/machine/_default_types.h	2012-10-16 14:45:23.000000000 -0400
++++ newlib-2.0.0-kos/newlib/libc/include/machine/_default_types.h	2013-05-18 01:00:45.000000000 -0400
+@@ -9,6 +9,8 @@
+ extern "C" {
+ #endif
+ 
++#include <sys/features.h>
++
+ /*
+  * Guess on types by examining *_MIN / *_MAX defines.
+  */
+diff -ruN newlib-2.0.0/newlib/libc/include/sys/types.h newlib-2.0.0-kos/newlib/libc/include/sys/types.h
+--- newlib-2.0.0/newlib/libc/include/sys/types.h	2012-07-06 06:41:21.000000000 -0400
++++ newlib-2.0.0-kos/newlib/libc/include/sys/types.h	2013-05-18 00:23:09.000000000 -0400
+@@ -286,7 +286,7 @@
  
  #if defined(__XMK__)
  typedef unsigned int pthread_t;          /* identify a thread */
@@ -48,65 +60,65 @@ diff -ruN newlib-1.19.0-orig/newlib/libc/include/sys/types.h newlib-1.19.0/newli
  typedef __uint32_t pthread_t;            /* identify a thread */
  #endif
  
-@@ -333,6 +333,7 @@
+@@ -304,6 +304,7 @@
+ #define PTHREAD_CREATE_DETACHED 0
+ #define PTHREAD_CREATE_JOINABLE  1
  
- #endif /* defined(__XMK__) || defined(__rtems__) */
- 
-+#ifndef _arch_dreamcast
++#if !defined(_arch_dreamcast)
  #if defined(__XMK__)
  typedef struct pthread_attr_s {
    int contentionscope;
-@@ -366,6 +367,7 @@
+@@ -337,6 +338,7 @@
  } pthread_attr_t;
  
  #endif /* !defined(__XMK__) */
-+#endif
++#endif /* !defined(_arch_dreamcast) */
  
  #if defined(_POSIX_THREAD_PROCESS_SHARED)
  /* NOTE: P1003.1c/D10, p. 81 defines following values for process_shared.  */
-@@ -405,6 +407,7 @@
+@@ -413,6 +415,7 @@
  } pthread_mutexattr_t;
  
  #else /* !defined(__XMK__) */
-+#ifndef _arch_dreamcast
++#if !defined(_arch_dreamcast)
  typedef __uint32_t pthread_mutex_t;      /* identify a mutex */
  
  typedef struct {
-@@ -421,10 +424,12 @@
+@@ -429,10 +432,12 @@
  #endif
    int   recursive;
  } pthread_mutexattr_t;
-+#endif /* !_arch_dreamcast */
++#endif /* !defined(_arch_dreamcast) */
  #endif /* !defined(__XMK__) */
  
  /* Condition Variables */
  
-+#ifndef _arch_dreamcast
++#if !defined(_arch_dreamcast)
  typedef __uint32_t pthread_cond_t;       /* identify a condition variable */
  
  typedef struct {
-@@ -433,15 +438,18 @@
+@@ -441,15 +446,18 @@
    int   process_shared;       /* allow this to be shared amongst processes */
  #endif
  } pthread_condattr_t;         /* a condition attribute object */
-+#endif
++#endif /* !defined(_arch_dreamcast) */
  
  /* Keys */
  
-+#ifndef _arch_dreamcast
++#if !defined(_arch_dreamcast)
  typedef __uint32_t pthread_key_t;        /* thread-specific data keys */
  
  typedef struct {
    int   is_initialized;  /* is this structure initialized? */
    int   init_executed;   /* has the initialization routine been run? */
  } pthread_once_t;       /* dynamic package initialization */
-+#endif
++#endif /* !defined(_arch_dreamcast) */
  #else
  #if defined (__CYGWIN__)
  #include <cygwin/types.h>
-diff -ruN newlib-1.19.0-orig/newlib/libc/stdlib/assert.c newlib-1.19.0/newlib/libc/stdlib/assert.c
---- newlib-1.19.0-orig/newlib/libc/stdlib/assert.c	2009-10-08 12:44:10.000000000 -0400
-+++ newlib-1.19.0/newlib/libc/stdlib/assert.c	2011-01-08 00:29:47.000000000 -0500
+diff -ruN newlib-2.0.0/newlib/libc/stdlib/assert.c newlib-2.0.0-kos/newlib/libc/stdlib/assert.c
+--- newlib-2.0.0/newlib/libc/stdlib/assert.c	2009-10-08 12:44:10.000000000 -0400
++++ newlib-2.0.0-kos/newlib/libc/stdlib/assert.c	2013-05-18 00:23:54.000000000 -0400
 @@ -47,6 +47,8 @@
  #include <stdlib.h>
  #include <stdio.h>
@@ -121,23 +133,23 @@ diff -ruN newlib-1.19.0-orig/newlib/libc/stdlib/assert.c newlib-1.19.0/newlib/li
    /* NOTREACHED */
  }
 +#endif
-diff -ruN newlib-1.19.0-orig/newlib/libc/sys/sh/ftruncate.c newlib-1.19.0/newlib/libc/sys/sh/ftruncate.c
---- newlib-1.19.0-orig/newlib/libc/sys/sh/ftruncate.c	2003-07-10 11:31:30.000000000 -0400
-+++ newlib-1.19.0/newlib/libc/sys/sh/ftruncate.c	2011-01-08 00:12:11.000000000 -0500
-@@ -2,8 +2,8 @@
- #include <sys/types.h>
- #include "sys/syscall.h"
- 
+diff -ruN newlib-2.0.0/newlib/libc/sys/sh/ftruncate.c newlib-2.0.0-kos/newlib/libc/sys/sh/ftruncate.c
+--- newlib-2.0.0/newlib/libc/sys/sh/ftruncate.c	2003-07-10 11:31:30.000000000 -0400
++++ newlib-2.0.0-kos/newlib/libc/sys/sh/ftruncate.c	2013-05-18 00:27:35.000000000 -0400
+@@ -1,9 +1 @@
+-#include <_ansi.h>
+-#include <sys/types.h>
+-#include "sys/syscall.h"
+-
 -int
-+/* int
- ftruncate (int file, off_t length)
- {
-   return __trap34 (SYS_ftruncate, file, length, 0);
+-ftruncate (int file, off_t length)
+-{
+-  return __trap34 (SYS_ftruncate, file, length, 0);
 -}
-+} */
-diff -ruN newlib-1.19.0-orig/newlib/libc/sys/sh/sys/lock.h newlib-1.19.0/newlib/libc/sys/sh/sys/lock.h
---- newlib-1.19.0-orig/newlib/libc/sys/sh/sys/lock.h	1969-12-31 19:00:00.000000000 -0500
-+++ newlib-1.19.0/newlib/libc/sys/sh/sys/lock.h	2011-01-08 00:15:28.000000000 -0500
++/* Nothing here. */
+diff -ruN newlib-2.0.0/newlib/libc/sys/sh/sys/lock.h newlib-2.0.0-kos/newlib/libc/sys/sh/sys/lock.h
+--- newlib-2.0.0/newlib/libc/sys/sh/sys/lock.h	1969-12-31 19:00:00.000000000 -0500
++++ newlib-2.0.0-kos/newlib/libc/sys/sh/sys/lock.h	2013-05-18 00:26:13.000000000 -0400
 @@ -0,0 +1,51 @@
 +/* KallistiOS ##version##
 +
@@ -190,9 +202,9 @@ diff -ruN newlib-1.19.0-orig/newlib/libc/sys/sh/sys/lock.h newlib-1.19.0/newlib/
 +
 +
 +#endif // __NEWLIB_LOCK_COMMON_H
-diff -ruN newlib-1.19.0-orig/newlib/libc/sys/sh/syscalls.c newlib-1.19.0/newlib/libc/sys/sh/syscalls.c
---- newlib-1.19.0-orig/newlib/libc/sys/sh/syscalls.c	2008-01-21 19:24:45.000000000 -0500
-+++ newlib-1.19.0/newlib/libc/sys/sh/syscalls.c	2011-01-08 00:12:55.000000000 -0500
+diff -ruN newlib-2.0.0/newlib/libc/sys/sh/syscalls.c newlib-2.0.0-kos/newlib/libc/sys/sh/syscalls.c
+--- newlib-2.0.0/newlib/libc/sys/sh/syscalls.c	2008-01-21 19:24:45.000000000 -0500
++++ newlib-2.0.0-kos/newlib/libc/sys/sh/syscalls.c	2013-05-18 00:26:46.000000000 -0400
 @@ -1,228 +1,2 @@
 -#include <_ansi.h>
 -#include <sys/types.h>
@@ -424,9 +436,9 @@ diff -ruN newlib-1.19.0-orig/newlib/libc/sys/sh/syscalls.c newlib-1.19.0/newlib/
 -}
 +// This is put in here to cause link errors if a proper newlib isn't present.
 +int __newlib_kos_patch = 1;
-diff -ruN newlib-1.19.0-orig/newlib/libc/sys/sh/trap.S newlib-1.19.0/newlib/libc/sys/sh/trap.S
---- newlib-1.19.0-orig/newlib/libc/sys/sh/trap.S	2002-02-08 02:11:13.000000000 -0500
-+++ newlib-1.19.0/newlib/libc/sys/sh/trap.S	2011-01-08 00:13:13.000000000 -0500
+diff -ruN newlib-2.0.0/newlib/libc/sys/sh/trap.S newlib-2.0.0-kos/newlib/libc/sys/sh/trap.S
+--- newlib-2.0.0/newlib/libc/sys/sh/trap.S	2002-02-08 02:11:13.000000000 -0500
++++ newlib-2.0.0-kos/newlib/libc/sys/sh/trap.S	2013-05-18 00:27:04.000000000 -0400
 @@ -1,43 +0,0 @@
 -#if __SH5__
 -	.mode	SHmedia
@@ -471,17 +483,17 @@ diff -ruN newlib-1.19.0-orig/newlib/libc/sys/sh/trap.S newlib-1.19.0/newlib/libc
 -perrno:
 -	.long	_errno
 -#endif /* ! __SH5__ */
-diff -ruN newlib-1.19.0-orig/newlib/libc/sys/sh/truncate.c newlib-1.19.0/newlib/libc/sys/sh/truncate.c
---- newlib-1.19.0-orig/newlib/libc/sys/sh/truncate.c	2003-07-10 11:31:30.000000000 -0400
-+++ newlib-1.19.0/newlib/libc/sys/sh/truncate.c	2011-01-08 00:13:24.000000000 -0500
-@@ -2,8 +2,8 @@
- #include <sys/types.h>
- #include "sys/syscall.h"
- 
+diff -ruN newlib-2.0.0/newlib/libc/sys/sh/truncate.c newlib-2.0.0-kos/newlib/libc/sys/sh/truncate.c
+--- newlib-2.0.0/newlib/libc/sys/sh/truncate.c	2003-07-10 11:31:30.000000000 -0400
++++ newlib-2.0.0-kos/newlib/libc/sys/sh/truncate.c	2013-05-18 00:27:23.000000000 -0400
+@@ -1,9 +1 @@
+-#include <_ansi.h>
+-#include <sys/types.h>
+-#include "sys/syscall.h"
+-
 -int
-+/* int
- truncate (const char *path, off_t length)
- {
-   return __trap34 (SYS_truncate, path, length, 0);
+-truncate (const char *path, off_t length)
+-{
+-  return __trap34 (SYS_truncate, path, length, 0);
 -}
-+} */
++/* Nothing here. */

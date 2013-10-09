@@ -134,6 +134,10 @@ SetOptions()
 	[ ! "$GLIBCHDIR" ] && GLIBCHDIR="$SYSTEM"
 	[ ! "$GDBBUILD" ] && GDBBUILD="$SYSTEM"
 
+	# These are patches common to to all compilers. For instance, when a patch
+	# is required to build any compiler:
+	# E.G. texinfo >= 5.1 & binutils <= 2.23.1 won't build
+	COMMONPATCHES="$BASEDIR/patches/common"
 	BINUTILS="binutils-$BINVER"
 	GCC="gcc-$GCCVER"
 	NEWLIB="newlib-$NEWLIBVER"
@@ -145,21 +149,21 @@ SetOptions()
 	GDB="gdb-$GDBVER"
 
 	# Binutils patches
-	BINPATCH=$PATCHDIR/$BINUTILS-*
+	BINPATCH="$COMMONPATCHES/$BINUTILS-* $PATCHDIR/$BINUTILS-*"
 	# Gcc patches
-	GCCPATCH=$PATCHDIR/$GCC-*
+	GCCPATCH="$COMMONPATCHES/$GCC-* $PATCHDIR/$GCC-*"
 	# Newlib patches
-	NEWLIBPATCH=$PATCHDIR/$NEWLIB-*
+	NEWLIBPATCH="$COMMONPATCHES/$NEWLIB-* $PATCHDIR/$NEWLIB-*"
 	# Kos patches
-	KOSPATCH=$PATCHDIR/kos-*
+	KOSPATCH="$COMMONPATCHES/$kos-* $PATCHDIR/kos-*"
 	# Kos-Ports patches
-	KOSPORTSPATCH=$PATCHDIR/kos-ports-*
+	KOSPORTSPATCH="$COMMONPATCHES/$kos-ports-* $PATCHDIR/kos-ports-*"
 	# Glibc patches
-	GLIBCPATCH=$PATCHDIR/$GLIBC-*
+	GLIBCPATCH="$COMMONPATCHES/$GLIBC-* $PATCHDIR/$GLIBC-*"
 	# uClibc patches
-	UCLIBCPATCH=$PATCHDIR/$UCLIBC-*
-	AVRLIBCPATCH=$PATCHDIR/$AVRLIBC-*
-	GDBPATCH=$PATCHDIR/$GDB-*
+	UCLIBCPATCH="$COMMONPATCHES/$UCLIBC-* $PATCHDIR/$UCLIBC-*"
+	AVRLIBCPATCH="$COMMONPATCHES/$AVRLIBC-* $PATCHDIR/$AVRLIBC-*"
+	GDBPATCH="$COMMONPATCHES/$GDB-* $PATCHDIR/$GDB-*"
 
 	# Now we can setup everything else by the variables defined above
 	#################################################################

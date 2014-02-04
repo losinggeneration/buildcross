@@ -217,16 +217,16 @@ Untar()
 	# Make sure to it's downloaded
 	Download $1 $lver
 
-	# Now check if the tar.bz2 file exists
-	if ! CheckExists $1-$lver.tar.bz2; then
-		# if it doesn't try for tar.gz
-		if CheckExists $1-$lver.tar.gz; then
-			# We have the tar.gz hooray
-			ExecuteCmd "tar xfz $1-$lver.tar.gz -C $SYSTEM" "Untaring $1-$lver.tar.gz"
-		fi
+	# Now check if the tar file exists
+	if CheckExists $1-$lver.tar.gz; then
+		# We have the tar.gz hooray
+		ExecuteCmd "tar xfz $1-$lver.tar.gz -C $SYSTEM" "Untaring $1-$lver.tar.gz"
 	elif CheckExists $1-$lver.tar.bz2; then
 		# Well we have the tar.bz2 good job
 		ExecuteCmd "tar xfj $1-$lver.tar.bz2 -C $SYSTEM" "Untaring $1-$lver.tar.bz2"
+	elif CheckExists $1-$lver.tar.xz; then
+		# We have the tar.xz
+		ExecuteCmd "tar xfJ $1-$lver.tar.xz -C $SYSTEM" "Untaring $1-$lver.tar.xz"
 	else
 		LogFatal "Cannot untar $1-$lver.tar.bz2 or $1-$lver.tar.gz. Make sure .$1-$lver-downloaded doesn't exist or the file might be corrupt. If you do get this message tell me how, because it seems like it shouldn't ever come up."
 	fi
@@ -297,11 +297,11 @@ Download()
 			fi
 			;;
 		"$KERNELNAME")
-			if ! CheckExists .$KERNEL-downloaded || ! CheckExists $KERNEL.tar.bz2; then
+			if ! CheckExists .$KERNEL-downloaded || ! CheckExists $KERNEL.tar.xz; then
 				if [ $(echo $KERNEL | grep libc) ]; then
-					ExecuteCmd "wget -c http://ep09.pld-linux.org/~mmazur/linux-libc-headers/$KERNEL.tar.bz2"
+					ExecuteCmd "wget -c http://ep09.pld-linux.org/~mmazur/linux-libc-headers/$KERNEL.tar.xz"
 				else
-					ExecuteCmd "wget -c http://www.kernel.org/pub/linux/kernel/v$(GetKernelBase)/$KERNEL.tar.bz2"
+					ExecuteCmd "wget -c http://www.kernel.org/pub/linux/kernel/v$(GetKernelBase)/$KERNEL.tar.xz"
 				fi
 				QuietExec "touch .$KERNEL-downloaded"
 			fi

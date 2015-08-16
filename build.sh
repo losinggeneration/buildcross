@@ -887,3 +887,20 @@ BuildGamecube()
 	InstallGamecubeRules
 	InstallGamecubeTools
 }
+
+###############################################################################
+# Build Genesis compiler
+###############################################################################
+BuildGenesis()
+{
+	# Make sure we're in the right target
+	SetOptions Genesis
+	All
+
+	TESTING="$INSTALL"
+
+	SetOptions Z80
+	LogTitle "Making Z80 Binutils for Genesis"
+	ConfigureBin
+	BuildBin
+}

@@ -284,6 +284,7 @@ Usage()
 	LogOutput "      to save space."
 	LogOutput "	-k Setup and build kos (Be sure KOSLOCATION is set)"
 	LogOutput "	-nlk Ues ln instead of cp for kos headers when installing newlib"
+	LogOutput "	-genesis Same as TESTING='/usr/local/m68k' $0 genesis -all z80 -cb -bb"
 	LogOutput "	-u Use uClibc instead of Glibc for Linux compilers"
 	LogOutput "	-dcl Build the Dreamcast Linux compiler"
 	LogOutput "	-gcl Build the GameCube Linux compiler"
@@ -569,6 +570,10 @@ ParseArgs()
 			;;
 		"-gc")
 			BuildGamecube
+			return 0
+			;;
+		"-genesis")
+			BuildGenesis
 			return 0
 			;;
 		"-dcl")

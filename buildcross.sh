@@ -22,7 +22,7 @@
 # Optional:
 # 3) Add your target to Usage()
 ###############################################################################
-BUILDCROSS_VERSION=1.8.1
+BUILDCROSS_VERSION=1.8.3
 # To reduce clutter I've moved functions into separate files.
 # These will include the functions so we can call them from  here.
 ###############################################################################
@@ -34,6 +34,8 @@ BUILDCROSS_VERSION=1.8.1
 
 # how to configure/build each (Binutils, Gcc, Newlib, uClibc, & KOS)
 . ./build.sh
+
+[ -f ".env" ] && . .env
 
 ###############################################################################
 # Our main function because I like C-like code

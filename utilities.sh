@@ -254,19 +254,19 @@ Download()
 	case $1 in
 		"binutils")
 			if ! CheckExists .$BINUTILS-downloaded || ! CheckExists $BINUTILS.tar.bz2 ; then
-				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/binutils/$BINUTILS.tar.bz2"
+				ExecuteCmd "wget -c https://ftpmirror.gnu.org/gnu/binutils/$BINUTILS.tar.bz2"
 				QuietExec "touch .$BINUTILS-downloaded"
 			fi
 			;;
 		"gcc")
-			if ! CheckExists .$GCC-downloaded || ! CheckExists $GCC.tar.bz2; then
-				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/gcc/$GCC/$GCC.tar.bz2"
+			if ! CheckExists .$GCC-downloaded || ! CheckExists $GCC.tar.gz; then
+				ExecuteCmd "wget -c https://ftpmirror.gnu.org/gnu/gcc/$GCC/$GCC.tar.gz"
 				QuietExec "touch .$GCC-downloaded"
 			fi
 			;;
 		"newlib")
 			if ! CheckExists .$NEWLIB-downloaded || ! CheckExists $NEWLIB.tar.gz; then
-				ExecuteCmd "wget -c ftp://sourceware.org/pub/newlib/$NEWLIB.tar.gz"
+				ExecuteCmd "wget -c https://sourceware.org/pub/newlib/$NEWLIB.tar.gz"
 				QuietExec "touch .$NEWLIB-downloaded"
 			fi
 			;;
@@ -286,7 +286,7 @@ Download()
 			;;
 		"glibc")
 			if ! CheckExists .$GLIBC-downloaded || ! CheckExists $GLIBC.tar.bz2; then
-				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/glibc/$GLIBC.tar.bz2"
+				ExecuteCmd "wget -c https://ftpmirror.gnu.org/gnu/glibc/$GLIBC.tar.bz2"
 				QuietExec "touch .$GLIBC-downloaded"
 			fi
 			;;
@@ -326,7 +326,7 @@ Download()
 			;;
 		"gdb")
 			if ! CheckExists .$GDB-downloaded || ! CheckExists $GDB.tar.bz2; then
-				ExecuteCmd "wget -c ftp://ftp.gnu.org/gnu/gdb/$GDB.tar.bz2"
+				ExecuteCmd "wget -c https://ftp.gnu.org/gnu/gdb/$GDB.tar.bz2"
 				QuietExec "touch .$GDB-downloaded"
 			fi
 			;;
@@ -545,6 +545,10 @@ CheckDeps()
 
 	if ! DependsResult "bunzip2"; then
 		NOTFOUND="$NOTFOUND, bunzip2"
+	fi
+
+	if ! DependsResult "xz"; then
+		NOTFOUND="$NOTFOUND, xz"
 	fi
 
 	if ! DependsResult "patch"; then

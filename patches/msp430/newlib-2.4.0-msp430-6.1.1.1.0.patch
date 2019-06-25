@@ -1,0 +1,95 @@
+diff -ruN newlib-2.4.0/libgloss/msp430/crt0.S newlib-2.4.0-msp430/libgloss/msp430/crt0.S
+--- newlib-2.4.0/libgloss/msp430/crt0.S	2016-03-29 14:33:42.000000000 -0700
++++ newlib-2.4.0-msp430/libgloss/msp430/crt0.S	2019-06-25 02:27:54.813690209 -0700
+@@ -72,9 +72,9 @@
+ 
+ 	mov_	#__bssstart, R12
+ 	clr.w	R13
+-	mov.w	#__bsssize, R14
++	mov_	#__bsssize, R14
+ #ifdef __MSP430X_LARGE__
+-	clr.w	R15		; We assume that __bsssize is never > 64M
++	clr.w	R15		; We assume that __bsssize is never > 64K
+ #endif
+ 	call_	#memset
+ 
+diff -ruN newlib-2.4.0/libgloss/msp430/msp430-sim.ld newlib-2.4.0-msp430/libgloss/msp430/msp430-sim.ld
+--- newlib-2.4.0/libgloss/msp430/msp430-sim.ld	2016-03-29 14:33:42.000000000 -0700
++++ newlib-2.4.0-msp430/libgloss/msp430/msp430-sim.ld	2019-06-25 02:27:54.813690209 -0700
+@@ -228,7 +228,7 @@
+ 
+   /* The rest are all not normally part of the runtime image.  */
+ 
+-  .MP430.attributes 0 :
++  .MSP430.attributes 0 :
+   {
+     KEEP (*(.MSP430.attributes))
+     KEEP (*(.gnu.attributes))
+diff -ruN newlib-2.4.0/libgloss/msp430/msp430xl-sim.ld newlib-2.4.0-msp430/libgloss/msp430/msp430xl-sim.ld
+--- newlib-2.4.0/libgloss/msp430/msp430xl-sim.ld	2016-03-29 14:33:42.000000000 -0700
++++ newlib-2.4.0-msp430/libgloss/msp430/msp430xl-sim.ld	2019-06-25 02:27:54.813690209 -0700
+@@ -406,7 +406,7 @@
+ 
+   /* The rest are all not normally part of the runtime image.  */
+ 
+-  .MP430.attributes 0 :
++  .MSP430.attributes 0 :
+   {
+     KEEP (*(.MSP430.attributes))
+     KEEP (*(.gnu.attributes))
+diff -ruN newlib-2.4.0/libgloss/msp430/write.c newlib-2.4.0-msp430/libgloss/msp430/write.c
+--- newlib-2.4.0/libgloss/msp430/write.c	2016-03-29 14:33:42.000000000 -0700
++++ newlib-2.4.0-msp430/libgloss/msp430/write.c	2019-06-25 02:27:54.813690209 -0700
+@@ -55,5 +55,5 @@
+       len -= l;
+       buf += l;
+     }
+-  return c;
++  return rv;
+ }
+diff -ruN newlib-2.4.0/newlib/libc/include/sys/config.h newlib-2.4.0-msp430/newlib/libc/include/sys/config.h
+--- newlib-2.4.0/newlib/libc/include/sys/config.h	2016-03-29 14:33:42.000000000 -0700
++++ newlib-2.4.0-msp430/newlib/libc/include/sys/config.h	2019-06-25 02:27:54.813690209 -0700
+@@ -155,6 +155,7 @@
+ #define _REENT_SMALL
+ #endif
+ 
++#define __BUFSIZ__ 256
+ #define __SMALL_BITFIELDS
+ 
+ #ifdef __MSP430X_LARGE__
+diff -ruN newlib-2.4.0/newlib/libc/include/sys/reent.h newlib-2.4.0-msp430/newlib/libc/include/sys/reent.h
+--- newlib-2.4.0/newlib/libc/include/sys/reent.h	2016-03-29 14:33:42.000000000 -0700
++++ newlib-2.4.0-msp430/newlib/libc/include/sys/reent.h	2019-06-25 02:27:54.813690209 -0700
+@@ -453,8 +453,8 @@
+     (var)->_current_locale = "C"; \
+   }
+ 
+-/* Only built the assert() calls if we are built with debugging.  */
+-#if DEBUG
++/* Only add assert() calls if we are specified to debug.  */
++#ifdef _REENT_CHECK_DEBUG
+ #include <assert.h>
+ #define __reent_assert(x) assert(x)
+ #else
+diff -ruN newlib-2.4.0/newlib/libc/stdlib/nano-mallocr.c newlib-2.4.0-msp430/newlib/libc/stdlib/nano-mallocr.c
+--- newlib-2.4.0/newlib/libc/stdlib/nano-mallocr.c	2016-03-29 14:33:42.000000000 -0700
++++ newlib-2.4.0-msp430/newlib/libc/stdlib/nano-mallocr.c	2019-06-25 02:27:54.813690209 -0700
+@@ -315,7 +315,7 @@
+ 
+     if (offset)
+     {
+-        *(int *)((char *)r + offset) = -offset;
++        *(long *)((char *)r + offset) = -offset;
+     }
+ 
+     assert(align_ptr + size <= (char *)r + alloc_size);
+@@ -588,7 +588,7 @@
+             /* Padding is used. Need to set a jump offset for aligned pointer
+             * to get back to chunk head */
+             assert(offset >= sizeof(int));
+-            *(int *)((char *)chunk_p + offset) = -offset;
++            *(long *)((char *)chunk_p + offset) = -offset;
+         }
+     }
+ 

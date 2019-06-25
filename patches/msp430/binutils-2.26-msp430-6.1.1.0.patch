@@ -1,0 +1,3946 @@
+diff -ruN binutils-2.26/bfd/ChangeLog binutils-2.26-msp430/bfd/ChangeLog
+--- binutils-2.26/bfd/ChangeLog	2016-01-25 00:54:07.000000000 -0800
++++ binutils-2.26-msp430/bfd/ChangeLog	2019-06-25 02:25:14.418837153 -0700
+@@ -1,3 +1,18 @@
++2018-09-03  Jozef Lawrynowicz <jozef.l@mittosystems.com>
++	    Alan Modra  <amodra@gmail.com>
++
++	PR 23595
++	elf.c (copy_elf_program_header): When first segment contains
++	only the headers and SHT_NOBITS sections, use segment p_filesz
++	to calculate header and padding size.  Use filepos of the first
++	section otherwise.
++
++2017-09-02  Alan Modra  <amodra@gmail.com>
++
++	* elf-eh-frame.c (offset_adjust): Avoid false positive gcc warning.
++	* elflink.c (bfd_elf_size_dynsym_hash_dynstr): Likewise.
++	* elfnn-aarch64.c (elfNN_aarch64_final_link_relocate): Likewise.
++
+ 2016-01-25  Tristan Gingold  <gingold@adacore.com>
+ 
+ 	* version.m4: Bump version to 2.26
+diff -ruN binutils-2.26/bfd/elf.c binutils-2.26-msp430/bfd/elf.c
+--- binutils-2.26/bfd/elf.c	2015-11-13 00:27:40.000000000 -0800
++++ binutils-2.26-msp430/bfd/elf.c	2019-06-25 02:25:14.418837153 -0700
+@@ -5844,6 +5844,52 @@
+   return TRUE;
+ }
+ 
++/* Required when an existing BFD has been opened for update.
++   _bfd_elf_compute_section_file_positions does too much processing which
++   causes problems for existing BFDs.  */
++static bfd_boolean
++_bfd_elf_recompute_section_file_positions (bfd *abfd)
++{
++  Elf_Internal_Shdr **shdrpp, **end_shdrpp;
++  Elf_Internal_Shdr *shdrp;
++  file_ptr off;
++
++  /* When opening for update, no data has been explicitly written to the output
++     BFD yet.  */
++  BFD_ASSERT (elf_next_file_pos (abfd) == 0);
++
++  if (!assign_file_positions_for_load_sections (abfd, NULL))
++    return FALSE;
++
++  /* assign_file_positions_for_non_load_sections won't do anything if filepos
++     != 0, so set filepos to 0 for all non-load sections.  */
++  shdrpp = elf_elfsections (abfd);
++  end_shdrpp = shdrpp + elf_numsections (abfd);
++  for (shdrpp++; shdrpp < end_shdrpp; shdrpp++)
++    {
++      shdrp = *shdrpp;
++      if ((shdrp->sh_flags & SHF_ALLOC) == 0
++	  && shdrp->bfd_section != NULL)
++	shdrp->bfd_section->filepos = 0;
++    }
++  if (!assign_file_positions_for_non_load_sections (abfd, NULL))
++    return FALSE;
++
++  /* Upon exit from this function, shstrtab will be emitted, so set the
++     filepos of symtab and strtab now.  */
++  off = elf_next_file_pos (abfd);
++
++  shdrp = & elf_symtab_hdr (abfd);
++  off = _bfd_elf_assign_file_position_for_section (shdrp, off, TRUE);
++
++  shdrp = &elf_tdata (abfd)->strtab_hdr;
++  off = _bfd_elf_assign_file_position_for_section (shdrp, off, TRUE);
++
++  elf_next_file_pos (abfd) = off;
++
++  return TRUE;
++}
++
+ bfd_boolean
+ _bfd_elf_write_object_contents (bfd *abfd)
+ {
+@@ -5856,6 +5902,9 @@
+   if (! abfd->output_has_begun
+       && ! _bfd_elf_compute_section_file_positions (abfd, NULL))
+     return FALSE;
++  else if (abfd->direction == both_direction
++	   && !_bfd_elf_recompute_section_file_positions (abfd))
++    return FALSE;
+ 
+   i_shdrp = elf_elfsections (abfd);
+ 
+@@ -6709,6 +6758,7 @@
+       Elf_Internal_Shdr *this_hdr;
+       asection *first_section = NULL;
+       asection *lowest_section;
++      bfd_boolean no_contents = TRUE;
+ 
+       /* Compute how many sections are in this segment.  */
+       for (section = ibfd->sections, section_count = 0;
+@@ -6720,6 +6770,8 @@
+ 	    {
+ 	      if (first_section == NULL)
+ 		first_section = section;
++	      if (elf_section_type (section) != SHT_NOBITS)
++		no_contents = FALSE;
+ 	      section_count++;
+ 	    }
+ 	}
+@@ -6816,8 +6868,17 @@
+ 	}
+ 
+       if (map->includes_filehdr && lowest_section != NULL)
+-	/* We need to keep the space used by the headers fixed.  */
+-	map->header_size = lowest_section->vma - segment->p_vaddr;
++	{
++	  /* Try to keep the space used by the headers plus any
++	     padding fixed.  If there are sections with file contents
++	     in this segment then the lowest sh_offset is the best
++	     guess.  Otherwise the segment only has file contents for
++	     the headers, and p_filesz is the best guess.  */
++	  if (no_contents)
++	    map->header_size = segment->p_filesz;
++	  else
++	    map->header_size = lowest_section->filepos;
++	}
+ 
+       if (!map->includes_phdrs
+ 	  && !map->includes_filehdr
+diff -ruN binutils-2.26/bfd/elfcode.h binutils-2.26-msp430/bfd/elfcode.h
+--- binutils-2.26/bfd/elfcode.h	2016-01-25 00:51:06.000000000 -0800
++++ binutils-2.26-msp430/bfd/elfcode.h	2019-06-25 02:25:14.418837153 -0700
+@@ -816,6 +816,68 @@
+ 	goto got_wrong_format_error;
+     }
+ 
++  /* Now that the section headers have been processed, we can initialise the
++     internal section header string table.
++     This is only needed when opening the bfd for update because there is no
++     table to initialise for write_direction, and for read_direction this
++     internal structure is not needed as we never write out the shstrtab.  */
++  if (abfd->direction == both_direction)
++    {
++      Elf_Internal_Shdr **shdrpp, **end_shdrpp;
++      Elf_Internal_Shdr *shdrp;
++      struct elf_strtab_hash *shstrtab;
++      unsigned int count = 1;
++
++      shstrtab = _bfd_elf_strtab_init ();
++      BFD_ASSERT (shstrtab);
++      elf_shstrtab (abfd) = shstrtab;
++
++      shdrpp = elf_elfsections (abfd);
++      end_shdrpp = shdrpp + elf_numsections (abfd);
++
++      for (shdrpp++; shdrpp < end_shdrpp; shdrpp++)
++	{
++	  shdrp = *shdrpp;
++	  if (shdrp->bfd_section != NULL)
++	    _bfd_elf_strtab_add (shstrtab, shdrp->bfd_section->name, FALSE);
++	  else if (shdrp == &elf_tdata (abfd)->shstrtab_hdr)
++	    _bfd_elf_strtab_add (shstrtab, ".shstrtab", FALSE);
++	  else if (shdrp == &elf_tdata (abfd)->strtab_hdr)
++	    _bfd_elf_strtab_add (shstrtab, ".strtab", FALSE);
++	  else if (shdrp == &elf_tdata (abfd)->symtab_hdr)
++	    _bfd_elf_strtab_add (shstrtab, ".symtab", FALSE);
++	  else
++	    continue;
++	  /* At this early stage in the processing of the BFD, sh_name refers to
++	     the offset into the internal shstrtab hash table which is indexed
++	     in increments of 1.
++	     In _bfd_elf_write_object_contents, sh_name gets set to its final
++	     value which is the actual byte offset into the .shstrtab section.
++	     _bfd_elf_strtab_add returns this byte offset of sh_name so
++	     we can't use that return value at this stage.  */
++	  shdrp->sh_name = count;
++	  count++;
++	}
++      elf_strtab_sec (abfd) = elf_tdata (abfd)->strtab_hdr.sh_name;
++      elf_shstrtab_sec (abfd) = elf_tdata (abfd)->shstrtab_hdr.sh_name;
++      elf_onesymtab (abfd) = elf_tdata (abfd)->symtab_hdr.sh_name;
++
++      Elf_Internal_Shdr *shstrtab_hdr;
++      const struct elf_backend_data *bed = get_elf_backend_data (abfd);
++      shstrtab_hdr = &elf_tdata (abfd)->shstrtab_hdr;
++      shstrtab_hdr->sh_type = SHT_STRTAB;
++      shstrtab_hdr->sh_flags = 0;
++      shstrtab_hdr->sh_addr = 0;
++      /* sh_size is set in _bfd_elf_assign_file_positions_for_non_load.  */
++      shstrtab_hdr->sh_entsize = 0;
++      shstrtab_hdr->sh_link = 0;
++      shstrtab_hdr->sh_info = 0;
++      /* sh_offset is set in _bfd_elf_assign_file_positions_for_non_load.  */
++      shstrtab_hdr->sh_addralign = 1;
++
++      (*bed->elf_backend_post_process_headers) (abfd, NULL);
++    }
++
+   /* Remember the entry point specified in the ELF file header.  */
+   bfd_set_start_address (abfd, i_ehdrp->e_entry);
+ 
+diff -ruN binutils-2.26/binutils/ChangeLog binutils-2.26-msp430/binutils/ChangeLog
+--- binutils-2.26/binutils/ChangeLog	2016-01-25 00:54:09.000000000 -0800
++++ binutils-2.26-msp430/binutils/ChangeLog	2019-06-25 02:25:14.418837153 -0700
+@@ -1,3 +1,37 @@
++2016-06-22  Nick Clifton  <nickc@redhat.com>
++
++	* testsuite/binutils-all/ar.exp: Skip tests for Alpha target.
++	Skip bfdtest1 tests for tic30 target.
++	* testsuite/binutils-all/arm/objdump.exp: Skip for aout arm
++	target.
++	* testsuite/binutils-all/compress.exp: Expect some tests to fail
++	on the nds32.
++	* testsuite/binutils-all/copy-3.d: Skip for go32 targets.
++	* testsuite/binutils-all/copy-4.d: Skip for AIX and linuxecoff
++	targets.
++	* testsuite/binutils-all/nm.exp: Treat beos based targets as ELF
++	targets.
++	* testsuite/binutils-all/objcopy.exp: Only run reverse bytes tests
++	if the bintest.o file was created.  Use the
++	get_standard_section_names proc to get the name of the data
++	section.
++	* testsuite/binutils-all/objdump.exp: Update regexps to allow for
++	RX section names.
++	* testsuite/binutils-all/readelf.exp: Use
++	get_standard_section_names proc to get the name of the data
++	section.
++	* testsuite/binutils-all/readelf.r: Allow for non standard text
++	section names.
++	* testsuite/binutils-all/readelf.s: Update regexps for tilepro.
++	* testsuite/binutils-all/size.exp: Allow for non standard section
++	names.
++	* testsuite/binutils-all/update-section.exp: Expect comapre 1vs4
++	to fail on mips targets.
++	* testsuite/lib/utils-lib.exp (default_binutils_run): Use
++	get_standard_section_names proc.
++	(run_dump_test): Likewise.
++	(proc get_standard_section_names): New proc.
++
+ 2016-01-25  Tristan Gingold  <gingold@adacore.com>
+ 
+ 	* configure: Regenerate.
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/ar.exp binutils-2.26-msp430/binutils/testsuite/binutils-all/ar.exp
+--- binutils-2.26/binutils/testsuite/binutils-all/ar.exp	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/ar.exp	2019-06-25 02:25:14.418837153 -0700
+@@ -26,6 +26,10 @@
+     }
+ }
+ 
++if {[istarget "alpha-*-*"]} then {
++  return
++}
++
+ # send_user "Version [binutil_version $AR]"
+ 
+ # Test long file name support
+@@ -561,7 +565,7 @@
+ # programs are built but not installed, running the testsuite on an
+ # installed toolchain will produce ERRORs about missing bfdtest1 and
+ # bfdtest2 executables.
+-if { [file exists $base_dir/bfdtest1] && [file exists $base_dir/bfdtest2] } {
++if { ![istarget "tic30-*-*"] && [file exists $base_dir/bfdtest1] && [file exists $base_dir/bfdtest2] } {
+     set bfdtests [list bfdtest1 bfdtest2]
+ 
+     long_filenames $bfdtests
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/arm/objdump.exp binutils-2.26-msp430/binutils/testsuite/binutils-all/arm/objdump.exp
+--- binutils-2.26/binutils/testsuite/binutils-all/arm/objdump.exp	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/arm/objdump.exp	2019-06-25 02:25:14.418837153 -0700
+@@ -18,6 +18,10 @@
+   return
+ }
+ 
++if {[istarget "*-*-aout"]} then {
++  return
++}
++
+ if {![is_remote host] && [which $OBJDUMP] == 0} then {
+     perror "$OBJDUMP does not exist"
+     return
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/compress.exp binutils-2.26-msp430/binutils/testsuite/binutils-all/compress.exp
+--- binutils-2.26/binutils/testsuite/binutils-all/compress.exp	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/compress.exp	2019-06-25 02:25:14.418837153 -0700
+@@ -162,6 +162,7 @@
+     }
+ }
+ 
++setup_xfail "nds32*-*-*"
+ set testname "objdump compress debug sections"
+ set got [remote_exec host "$OBJDUMP -W ${compressedfile}.o" "" "/dev/null" "objdump.out"]
+ if { [lindex $got 0] != 0 || ![string match "" [lindex $got 1]] } then {
+@@ -174,6 +175,7 @@
+     pass "$testname"
+ }
+ 
++setup_xfail "nds32*-*-*"
+ set testname "objdump compress debug sections 3"
+ set got [remote_exec host "$OBJDUMP -W ${compressedfile3}.o" "" "/dev/null" "objdump.out"]
+ if { [lindex $got 0] != 0 || ![string match "" [lindex $got 1]] } then {
+@@ -544,6 +546,7 @@
+     }
+ }
+ 
++setup_xfail "nds32*-*-*"
+ set testname "objcopy compress debug sections in archive with zlib-gabi"
+ set got [binutils_run $OBJCOPY "--compress-debug-sections=zlib-gabi ${copyfile}gabi.a ${compressedcopyfile}gabi.a"]
+ if ![string match "" $got] then {
+@@ -564,6 +567,7 @@
+     }
+ }
+ 
++setup_xfail "nds32*-*-*"
+ set testname "objdump compress debug sections 3 with zlib-gabi"
+ set got [remote_exec host "$OBJDUMP -W ${compressedfile3}gabi.o" "" "/dev/null" "objdump.out"]
+ if { [lindex $got 0] != 0 || ![string match "" [lindex $got 1]] } then {
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/copy-3.d binutils-2.26-msp430/binutils/testsuite/binutils-all/copy-3.d
+--- binutils-2.26/binutils/testsuite/binutils-all/copy-3.d	2013-11-04 07:33:37.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/copy-3.d	2019-06-25 02:25:14.418837153 -0700
+@@ -3,7 +3,7 @@
+ #objcopy: --set-section-flags .text=alloc,data
+ #name: copy with setting section flags 3
+ #source: bintest.s
+-#not-target: *-*-*aout *-*-*pe *-*-*coff hppa*-*-hpux* *-*-cygwin* *-*-mingw* m68k-*-netbsd m68k-*-openbsd* ns32k-*-netbsd rs6000-*-*
++#not-target: *-*-*aout *-*-*coff *-*-cygwin* *-*-darwin *-*-mingw* *-*-go32 *-*-*pe hppa*-*-hpux* m68k-*-netbsd m68k-*-openbsd* ns32k-*-netbsd powerpc-*-aix* rs6000-*-* rx-*-*
+ # The .text # section in PE/COFF has a fixed set of flags and these
+ # cannot be changed.  We skip it for them.
+ 
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/copy-4.d binutils-2.26-msp430/binutils/testsuite/binutils-all/copy-4.d
+--- binutils-2.26/binutils/testsuite/binutils-all/copy-4.d	2013-11-04 07:33:37.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/copy-4.d	2019-06-25 02:25:14.418837153 -0700
+@@ -2,6 +2,7 @@
+ #source: bintest.s
+ #strip: --strip-unneeded
+ #nm: -n
++#not-target: *-*-aix* *-*-linuxecoff
+ #name: strip --strip-unneeded on common symbol
+ 
+ #...
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/nm.exp binutils-2.26-msp430/binutils/testsuite/binutils-all/nm.exp
+--- binutils-2.26/binutils/testsuite/binutils-all/nm.exp	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/nm.exp	2019-06-25 02:25:14.418837153 -0700
+@@ -163,6 +163,7 @@
+ # all the ELF variants, but adding the patterns here to that proc then
+ # introduces a whole slew of new regressions in the GAS and LD testsuites.
+ if {   [is_elf_format]
++    || [istarget *-*-beos]
+     || [istarget *-*-dragonfly*]
+     || [istarget *-*-*elf]
+     || [istarget *-*-freebsd*]
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/objcopy.exp binutils-2.26-msp430/binutils/testsuite/binutils-all/objcopy.exp
+--- binutils-2.26/binutils/testsuite/binutils-all/objcopy.exp	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/objcopy.exp	2019-06-25 02:25:14.418837153 -0700
+@@ -46,9 +46,10 @@
+     global tempfile
+     global copyfile
+ 
+-    if {![binutils_assemble $srcdir/$subdir/${srcfile} tmpdir/bintest.o]} then {
++    if {![binutils_assemble $srcdir/$subdir/${srcfile} $tempfile]} then {
+  	perror "unresolved $testname"
+ 	unresolved "objcopy ($testname)"
++	remote_file host delete $tempfile
+ 	return
+     }
+ 
+@@ -107,41 +108,48 @@
+ 
+ objcopy_test "simple copy" bintest.s
+ 
+-# Test reversing bytes in a section.
++if { [file exists $tempfile] } {
++    # Test reversing bytes in a section.
+ 
+-set reversed ${tempfile}-reversed
+-set got [binutils_run $OBJCOPY "$OBJCOPYFLAGS -j .data --reverse-bytes=4 $tempfile $reversed"]
+-
+-if ![string equal "" $got] then {
+-    fail "objcopy --reverse-bytes"
+-} else {
+-    if [is_remote host] {
+-        remote_upload host ${reversed} tmpdir/copy-reversed.o
+-        set reversed tmpdir/copy-reversed.o
++    set reversed ${tempfile}-reversed
++    set sect_names [get_standard_section_names]
++    if { $sect_names != "" } {
++	set got [binutils_run $OBJCOPY "$OBJCOPYFLAGS -j [lindex $sect_names 1] --reverse-bytes=4 $tempfile $reversed"]
++    } else {
++	set got [binutils_run $OBJCOPY "$OBJCOPYFLAGS -j .data --reverse-bytes=4 $tempfile $reversed"]
+     }
+ 
+-    set origdata [binutils_run $OBJDUMP "$OBJDUMPFLAGS -s -j .data $tempfile"]
+-    set revdata [binutils_run $OBJDUMP "$OBJDUMPFLAGS -s -j .data $reversed"]
++    if ![string equal "" $got] then {
++	fail "objcopy --reverse-bytes"
++    } else {
++	if [is_remote host] {
++	    remote_upload host ${reversed} tmpdir/copy-reversed.o
++	    set reversed tmpdir/copy-reversed.o
++	}
+ 
+-    set want "^ \[0-9\]+ (\[0-9\]+)"
+-    set found_orig [regexp -lineanchor $want $origdata -> origdata]
+-    set found_rev [regexp -lineanchor $want $revdata -> revdata]
++	set origdata [binutils_run $OBJDUMP "$OBJDUMPFLAGS -s -j .data $tempfile"]
++	set  revdata [binutils_run $OBJDUMP "$OBJDUMPFLAGS -s -j .data $reversed"]
+ 
+-    if {$found_orig == 0 || $found_rev == 0} then {
+-	# som doesn't have a .data section
+-	setup_xfail "hppa*-*-hpux*"
+-	clear_xfail "hppa*64*-*-hpux*"
++	set want "^ \[0-9\]+ (\[0-9\]+)"
++	set found_orig [regexp -lineanchor $want $origdata -> origdata]
++	set found_rev [regexp -lineanchor $want $revdata -> revdata]
+ 
+-        fail "objcopy --reverse-bytes"
+-    } else {
+-        scan $origdata "%2x%2x%2x%2x" b1 b2 b3 b4
+-        scan $revdata "%2x%2x%2x%2x" c4 c3 c2 c1
++	if {$found_orig == 0 || $found_rev == 0} then {
++	    # som doesn't have a .data section
++	    setup_xfail "hppa*-*-hpux*"
++	    clear_xfail "hppa*64*-*-hpux*"
+ 
+-        if {$b1 == $c1 && $b2 == $c2 && $b3 == $c3 && $b4 == $c4} then {
+-            pass "objcopy --reverse-bytes"
+-        } else {
+-            fail "objcopy --reverse-bytes"
+-        }
++	    fail "objcopy --reverse-bytes"
++	} else {
++	    scan $origdata "%2x%2x%2x%2x" b1 b2 b3 b4
++	    scan $revdata "%2x%2x%2x%2x" c4 c3 c2 c1
++
++	    if {$b1 == $c1 && $b2 == $c2 && $b3 == $c3 && $b4 == $c4} then {
++		pass "objcopy --reverse-bytes"
++	    } else {
++		fail "objcopy --reverse-bytes"
++	    }
++	}
+     }
+ }
+ 
+@@ -184,66 +192,68 @@
+ 
+ # Test generating S records.
+ 
+-# We make the srec filename 8.3 compatible. Note that the header string
+-# matched against depends on the name of the file. Ugh.
+-
+-if [is_remote host] {
+-    set srecfile copy.sre
+-    set header_string S00B0000636F70792E737265C1
+-} else {
+-    set srecfile ${copyfile}.srec
+-    set header_string S0130000746D706469722F636F70792E7372656397
+-}
+-
+-set got [binutils_run $OBJCOPY "$OBJCOPYFLAGS -O srec $tempfile ${srecfile}"]
++if { [file exists $tempfile] } {
++    # We make the srec filename 8.3 compatible. Note that the header string
++    # matched against depends on the name of the file. Ugh.
+ 
+-if ![string equal "" $got] then {
+-    fail "objcopy -O srec"
+-} else {
+     if [is_remote host] {
+-	remote_upload host ${srecfile} tmpdir/copy.srec
+-	set srecfile tmpdir/copy.srec
++	set srecfile copy.sre
++	set header_string S00B0000636F70792E737265C1
++    } else {
++	set srecfile ${copyfile}.srec
++	set header_string S0130000746D706469722F636F70792E7372656397
+     }
+-    set file [open ${srecfile} r]
+ 
+-    # The first S record is fixed by the file name we are using.
+-    gets $file line
+-    send_log "$line\n"
+-    verbose $line
+-    if ![regexp "$header_string.*" $line] {
+-	send_log "bad header\n"
++    set got [binutils_run $OBJCOPY "$OBJCOPYFLAGS -O srec $tempfile ${srecfile}"]
++
++    if ![string equal "" $got] then {
+ 	fail "objcopy -O srec"
+     } else {
+-	while {[gets $file line] != -1 \
+-	       && [regexp "^S\[123\]\[0-9a-fA-F\]+\[\r\n\]*$" $line]} {
+-	    send_log "$line\n"
+-	    verbose $line
+-	    set line "**EOF**"
++	if [is_remote host] {
++	    remote_upload host ${srecfile} tmpdir/copy.srec
++	    set srecfile tmpdir/copy.srec
+ 	}
++	set file [open ${srecfile} r]
++
++	# The first S record is fixed by the file name we are using.
++	gets $file line
+ 	send_log "$line\n"
+ 	verbose $line
+-	if ![regexp "^S\[789\]\[0-9a-fA-F\]+\[\r\n\]*$" $line] then {
+-	    send_log "bad trailer\n"
++	if ![regexp "$header_string.*" $line] {
++	    send_log "bad header\n"
+ 	    fail "objcopy -O srec"
+ 	} else {
+-	    if {[gets $file line] != -1} then {
+-		send_log "garbage at end\n"
++	    while {[gets $file line] != -1 \
++		       && [regexp "^S\[123\]\[0-9a-fA-F\]+\[\r\n\]*$" $line]} {
+ 		send_log "$line\n"
+ 		verbose $line
++		set line "**EOF**"
++	    }
++	    send_log "$line\n"
++	    verbose $line
++	    if ![regexp "^S\[789\]\[0-9a-fA-F\]+\[\r\n\]*$" $line] then {
++		send_log "bad trailer\n"
+ 		fail "objcopy -O srec"
+ 	    } else {
+-		set got [binutils_run $OBJDUMP "$OBJDUMPFLAGS -f ${srecfile}"]
+-		if ![regexp "file format srec" $got] then {
+-		    send_log "objdump failed\n"
++		if {[gets $file line] != -1} then {
++		    send_log "garbage at end\n"
++		    send_log "$line\n"
++		    verbose $line
+ 		    fail "objcopy -O srec"
+ 		} else {
+-		    pass "objcopy -O srec"
++		    set got [binutils_run $OBJDUMP "$OBJDUMPFLAGS -f ${srecfile}"]
++		    if ![regexp "file format srec" $got] then {
++			send_log "objdump failed\n"
++			fail "objcopy -O srec"
++		    } else {
++			pass "objcopy -O srec"
++		    }
+ 		}
+ 	    }
+ 	}
+-    }
+ 
+-    close $file
++	close $file
++    }
+ }
+ 
+ # Test setting and adjusting the start address.  We only test this
+@@ -644,7 +654,7 @@
+ 
+ 	# This also fails for mips*-*-elf targets.  See elf32-mips.c
+ 	# mips_elf_sym_is_global.
+-	setup_xfail "mips*-*-elf"
++	setup_xfail "mips*-*-elf" "tx39-*-*"
+ 
+ 	setup_xfail "arm*-*-coff"
+ 	setup_xfail "arm*-*-pe"
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/objdump.exp binutils-2.26-msp430/binutils/testsuite/binutils-all/objdump.exp
+--- binutils-2.26/binutils/testsuite/binutils-all/objdump.exp	2016-01-25 00:51:06.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/objdump.exp	2019-06-25 02:25:14.418837153 -0700
+@@ -86,7 +86,7 @@
+ 
+ set got [binutils_run $OBJDUMP "$OBJDUMPFLAGS -h $testfile"]
+ 
+-set want "$testfile:\[ 	\]*file format.*Sections.*\[0-9\]+\[ 	\]+\[^ 	\]*(text|TEXT|\\\$CODE\\\$)\[^ 	\]*\[ 	\]*(\[0-9a-fA-F\]+).*\[0-9\]+\[ 	\]+\[^ 	\]*(\\.data|DATA)\[^ 	\]*\[ 	\]*(\[0-9a-fA-F\]+)"
++set want "$testfile:\[ 	\]*file format.*Sections.*\[0-9\]+\[ 	\]+\[^ 	\]*(text|TEXT|P|\\\$CODE\\\$)\[^ 	\]*\[ 	\]*(\[0-9a-fA-F\]+).*\[0-9\]+\[ 	\]+\[^ 	\]*(\\.data|DATA|D_1)\[^ 	\]*\[ 	\]*(\[0-9a-fA-F\]+)"
+ 
+ if ![regexp $want $got all text_name text_size data_name data_size] then {
+     fail "objdump -h"
+@@ -136,7 +136,7 @@
+ 
+ set got [binutils_run $OBJDUMP "$OBJDUMPFLAGS -r $testfile"]
+ 
+-set want "$testfile:\[ 	\]*file format.*RELOCATION RECORDS FOR \\\[\[^\]\]*(text|TEXT|\\\$CODE\\\$)\[^\]\]*\\\].*external_symbol"
++set want "$testfile:\[ 	\]*file format.*RELOCATION RECORDS FOR \\\[\[^\]\]*(text|TEXT|P|\\\$CODE\\\$)\[^\]\]*\\\].*external_symbol"
+ 
+ if [regexp $want $got] then {
+     pass "objdump -r"
+@@ -148,7 +148,7 @@
+ 
+ set got [binutils_run $OBJDUMP "$OBJDUMPFLAGS -s $testfile"]
+ 
+-set want "$testfile:\[ 	\]*file format.*Contents.*(text|TEXT|\\\$CODE\\\$)\[^0-9\]*\[ 	\]*\[0-9a-fA-F\]*\[ 	\]*(00000001|01000000|00000100).*Contents.*(data|DATA)\[^0-9\]*\[ 	\]*\[0-9a-fA-F\]*\[ 	\]*(00000002|02000000|00000200)"
++set want "$testfile:\[ 	\]*file format.*Contents.*(text|TEXT|P|\\\$CODE\\\$)\[^0-9\]*\[ 	\]*\[0-9a-fA-F\]*\[ 	\]*(00000001|01000000|00000100).*Contents.*(data|DATA|D_1)\[^0-9\]*\[ 	\]*\[0-9a-fA-F\]*\[ 	\]*(00000002|02000000|00000200)"
+ 
+ if [regexp $want $got] then {
+     pass "objdump -s"
+@@ -265,6 +265,7 @@
+ 	send_log "\n"
+     }
+ 
++    setup_xfail "msp430-*-*" "nds32*-*-*"
+     if { [regexp_diff objdump.out $srcdir/$subdir/dw2-ranges.W] } then {
+ 	fail "objdump -W for debug_ranges"
+     } else {
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/readelf.exp binutils-2.26-msp430/binutils/testsuite/binutils-all/readelf.exp
+--- binutils-2.26/binutils/testsuite/binutils-all/readelf.exp	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/readelf.exp	2019-06-25 02:25:14.418837153 -0700
+@@ -100,7 +100,7 @@
+ 
+     set target_machine ""
+     if [istarget "mips*-*-*"] then {
+-	if { [istarget "mips*-*-*linux*"]
++	if {    [istarget "mips*-*-*linux*"]
+ 	     || [istarget "mips*-sde-elf*"]
+ 	     || [istarget "mips*-mti-elf*"]
+ 	     || [istarget "mips*-img-elf*"]
+@@ -269,7 +269,12 @@
+     set tempfile [remote_download host tmpdir/dumptest.o]
+ 
+     # Run "readelf -p.data" on it.
+-    set got [remote_exec host "$READELF $READELFFLAGS -p.data $tempfile" "" "/dev/null" "readelf.out"]
++    set sect_names [get_standard_section_names]
++    if { $sect_names != "" } {
++	set got [remote_exec host "$READELF $READELFFLAGS -p[lindex $sect_names 1] $tempfile" "" "/dev/null" "readelf.out"]
++    } else {
++	set got [remote_exec host "$READELF $READELFFLAGS -p.data $tempfile" "" "/dev/null" "readelf.out"]
++    }
+     set got [lindex $got 1]
+ 
+     # Upload the results.
+@@ -334,6 +339,7 @@
+ # Run the tests.
+ readelf_test -h $tempfile readelf.h  {}
+ readelf_test -S $tempfile readelf.s  {}
++setup_xfail "mips-*-*irix*"
+ readelf_test -s $tempfile readelf.ss {}
+ readelf_test -r $tempfile readelf.r  {}
+ 
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/readelf.r binutils-2.26-msp430/binutils/testsuite/binutils-all/readelf.r
+--- binutils-2.26/binutils/testsuite/binutils-all/readelf.r	2014-10-14 00:32:02.000000000 -0700
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/readelf.r	2019-06-25 02:25:14.418837153 -0700
+@@ -1,5 +1,5 @@
+ 
+-Relocation section '.rel.*text' at offset 0x.* contains . entries:
++Relocation section '.rel.*' at offset 0x.* contains . entries:
+  Offset     Info    Type            Sym.Value  Sym. Name.*
+ # NDS32 targets puts R_NDS32_RELAX_ENT here
+ #...
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/readelf.s binutils-2.26-msp430/binutils/testsuite/binutils-all/readelf.s
+--- binutils-2.26/binutils/testsuite/binutils-all/readelf.s	2014-10-14 00:32:02.000000000 -0700
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/readelf.s	2019-06-25 02:25:14.418837153 -0700
+@@ -5,12 +5,12 @@
+  +\[ 0\] +NULL +00000000 000000 000000 00 +0 +0 +0
+ # On the normal MIPS systems, sections must be aligned to 16 byte
+ # boundaries. On IA64, text sections are aligned to 16 byte boundaries.
+- +\[ 1\] .text +PROGBITS +00000000 0000(34|40) 0000(08|10) 00 +AX +0 +0 +(.|..)
+- +\[ 2\] .rel.+text +REL. +0+ 0+.* 0000.. 0. +I +.+ +1 +4
++ +\[ 1\] .* +PROGBITS +00000000 0000(34|38|40) 0000(08|10) 00 +AX +0 +0 +(.|..)
++ +\[ 2\] .rel.* +REL. +0+ 0+.* 0000.. 0. +I +.+ +1 +4
+ # MIPS targets put .rela.text here.
+ #...
+- +\[ .\] .data +PROGBITS +00000000 0000(3c|48|50) 0000(04|10) 00 +WA +0 +0 +(.|..)
+- +\[ .\] .bss +NOBITS +00000000 0000(40|4c|60) 000000 00 +WA +0 +0 +(.|..)
++ +\[ .\] .* +PROGBITS +00000000 0000(3c|40|48|50) 0000(04|10) 00 +WA +0 +0 +(.|..)
++ +\[ .\] .* +NOBITS +00000000 0000(40|44|4c|60) 000000 00 +WA +0 +0 +(.|..)
+ # MIPS targets put .reginfo, .mdebug, .MIPS.abiflags and .gnu.attributes here.
+ # v850 targets put .call_table_data and .call_table_text here.
+ #...
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/size.exp binutils-2.26-msp430/binutils/testsuite/binutils-all/size.exp
+--- binutils-2.26/binutils/testsuite/binutils-all/size.exp	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/size.exp	2019-06-25 02:25:14.418837153 -0700
+@@ -66,7 +66,7 @@
+ 
+ set got [binutils_run $SIZE "$SIZEFLAGS -A ${testfile}"]
+ 
+-set want "${testfile}.*(text|TEXT)\[^\n\r\]*\[ 	\]($dec)\[ 	\]+$dec.*(\\.data|DATA)\[^\n\r\]*\[ 	\]($dec)\[ 	\]+$dec"
++set want "${testfile}.*(text|TEXT|P)\[^\n\r\]*\[ 	\]($dec)\[ 	\]+$dec.*(\\.data|DATA|D_1)\[^\n\r\]*\[ 	\]($dec)\[ 	\]+$dec"
+ 
+ if ![regexp $want $got all textname textsize dataname datasize] then {
+     fail "size -A"
+diff -ruN binutils-2.26/binutils/testsuite/binutils-all/update-section.exp binutils-2.26-msp430/binutils/testsuite/binutils-all/update-section.exp
+--- binutils-2.26/binutils/testsuite/binutils-all/update-section.exp	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/binutils-all/update-section.exp	2019-06-25 02:25:14.418837153 -0700
+@@ -99,6 +99,7 @@
+ # Check that the updated object files are as expected.
+ do_compare update-1.o update-2.o
+ do_compare update-1.o update-3.o
++setup_xfail "mips*-*-*" "tx39-*-*"
+ do_compare update-1.o update-4.o
+ 
+ # Check that --update-section on an unknown section will fail.
+diff -ruN binutils-2.26/binutils/testsuite/lib/utils-lib.exp binutils-2.26-msp430/binutils/testsuite/lib/utils-lib.exp
+--- binutils-2.26/binutils/testsuite/lib/utils-lib.exp	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/binutils/testsuite/lib/utils-lib.exp	2019-06-25 02:25:14.418837153 -0700
+@@ -66,6 +66,15 @@
+ 	}
+     }
+ 
++    # For objdump, automatically translate standard section
++    # names to the targets one, if they are different.
++    set sect_names [get_standard_section_names]
++    if { $sect_names != "" && [string match "*objdump" $prog] } {
++        regsub -- "-j \\.text" $progargs "-j [lindex $sect_names 0]" progargs
++        regsub -- "-j \\.data" $progargs "-j [lindex $sect_names 1]" progargs
++        regsub -- "-j \\.bss"  $progargs "-j [lindex $sect_names 2]" progargs
++    }
++
+     send_log "$prog $progargs\n"
+     verbose "$prog $progargs"
+ 
+@@ -487,6 +496,15 @@
+ 	return
+     }
+ 
++    # For objdump, automatically translate standard section names to the targets one,
++    # if they are different.
++    set sect_names [get_standard_section_names]
++    if { $sect_names != "" && $dumpprogram == "objdump"} {
++        regsub -- "-j \\.text" $progopts1 "-j [lindex $sect_names 0]" progopts1
++        regsub -- "-j \\.data" $progopts1 "-j [lindex $sect_names 1]" progopts1
++        regsub -- "-j \\.bss"  $progopts1 "-j [lindex $sect_names 2]" progopts1
++    }
++
+     verbose "running $binary $progopts $progopts1" 3
+ 
+     set cmd "$binary $progopts $progopts1 ${copyfile}.o"
+@@ -563,3 +581,16 @@
+     global verbose
+     if $verbose>$level then { eval verbose "$expr" $level }
+ }
++
++# Internal procedure: return the names of the standard sections
++#
++proc get_standard_section_names {} {
++    if [istarget "rx-*-*"] {
++        return { "P" "D_1" "B_1" }
++    }
++    if [istarget "alpha*-*-*vms*"] {
++        # Double quote: for TCL and for sh.
++        return { "\\\$CODE\\\$" "\\\$DATA\\\$" "\\\$BSS\\\$" }
++    }
++    return
++}
+diff -ruN binutils-2.26/dev/null binutils-2.26-msp430/dev/null
+--- binutils-2.26/dev/null	1969-12-31 16:00:00.000000000 -0800
++++ binutils-2.26-msp430/dev/null	2019-06-25 02:25:14.422837123 -0700
+@@ -0,0 +1,44 @@
++	.file	"tester.c"
++.text
++	.global	foo
++	.section	.rodata
++.LC0:
++	.string	"bar"
++	.section	.lower.data,"aw",@progbits
++	.balign 2
++	.type	foo, @object
++	.size	foo, 2
++foo:
++	.short	.LC0
++	.section	.lower.text,"ax",@progbits
++	.balign 2
++	.global	main
++	.type	main, @function
++main:
++; start of function
++; framesize_regs:     0
++; framesize_locals:   2
++; framesize_outgoing: 0
++; framesize:          2
++; elim ap -> fp       2
++; elim fp -> sp       2
++; saved regs:(none)
++	; start of prologue
++	SUB.W	#2, R1
++	; end of prologue
++	MOV.W	#1, @R1
++	BR	#.L2
++.L3:
++	MOV.W	&foo, R12
++	ADD.W	#-1, R12
++	MOV.W	R12, &foo
++.L2:
++	MOV.W	@R1, R12
++	CMP.W	#0, R12 { JNE	.L3
++	MOV.B	#0, R12
++	; start of epilogue
++	.refsym	__crt0_call_exit
++	ADD.W	#2, R1
++	RET
++	.size	main, .-main
++	.ident	"GCC: (jozef) 7.3.2"
+diff -ruN binutils-2.26/gas/ChangeLog binutils-2.26-msp430/gas/ChangeLog
+--- binutils-2.26/gas/ChangeLog	2016-01-25 00:54:08.000000000 -0800
++++ binutils-2.26-msp430/gas/ChangeLog	2019-06-25 02:25:14.418837153 -0700
+@@ -1,3 +1,44 @@
++2017-10-05  Nick Clifton  <nickc@redhat.com>
++
++	PR 22133
++	* config/tc-msp430.c (parse_exp): Skip an 'h' suffix to constant
++	expressions.
++	(msp430_srcoperand): Check that the entire text was parsed by
++	parse_exp.
++	(msp430_operands): Likewise.
++	* testsuite/gas/msp430/pr22133.s: New test file.
++	* testsuite/gas/msp430/pr22133.d: New test driver.
++	* testsuite/gas/msp430/pr22133.s: Expected error output.
++	* testsuite/gas/msp430/msp430.exp: Run the new test.
++
++2018-06-26  Nick Clifton  <nickc@redhat.com>
++
++	PR 23335
++	* config/tc-msp430.c (check_reg): Only accept register name
++	strings that do not end in an alphanumeric character.
++	* testsuite/gas/msp430/msp430x.d: Update expected disassembly.
++
++2017-08-29  Jozef Lawrynowicz  <jozef.l@somniumtech.com>
++
++	* config/tc-msp430.c (md_parse_option): Define high data and high
++	bss symbols if -mdata-region is passed.
++	Define -mdata-region open.
++	* doc/c-msp430.texi: Document -mdata-region.
++	* testsuite/gas/msp430/high-data-bss-sym.d: New test.
++	* testsuite/gas/msp430/high-data-bss-sym.s: New.
++	* testsuite/gas/msp430/msp430.exp: Add -mdata-region tests.
++
++2016-02-03  Kevin Buettner  <kevinb@redhat.com>
++
++    	* config/tc-msp430.h (DWARF2_ADDR_SIZE): Set to 4.
++
++2016-04-06  Nick Clifton  <nickc@redhat.com>
++
++	* config/tc-msp430.c (msp430_operands): Check for a NOP preceding
++	an EINT instruction.  Warn/fix as necessary.
++	* testsuite/gas/msp430/bad.s: Add test of EINT without preceding NOP.
++	* testsuite/gas/msp430/bad.l: Update expected messages.
++
+ 2016-01-25  Tristan Gingold  <gingold@adacore.com>
+ 
+ 	* configure: Regenerate.
+diff -ruN binutils-2.26/gas/config/tc-msp430.c binutils-2.26-msp430/gas/config/tc-msp430.c
+--- binutils-2.26/gas/config/tc-msp430.c	2016-01-25 00:51:06.000000000 -0800
++++ binutils-2.26-msp430/gas/config/tc-msp430.c	2019-06-25 02:25:14.418837153 -0700
+@@ -418,6 +418,13 @@
+   expression (op);
+   if (op->X_op == O_absent)
+     as_bad (_("missing operand"));
++  /* Our caller is likely to check that the entire expression was parsed.
++     If we have found a hex constant with an 'h' suffix, ilp will be left
++     pointing at the 'h', so skip it here.  */
++  if (input_line_pointer != NULL
++      && op->X_op == O_constant
++      && (*input_line_pointer == 'h' || *input_line_pointer == 'H'))
++    ++ input_line_pointer;
+   return input_line_pointer;
+ }
+ 
+@@ -628,7 +635,7 @@
+       /* Now get profiling info.  */
+       halt = extract_operand (input_line_pointer, str, 1024);
+       /* Process like ".word xxx" directive.  */
+-      parse_exp (str, & exp);
++      (void) parse_exp (str, & exp);
+       emit_expr (& exp, 2);
+       input_line_pointer = halt;
+     }
+@@ -679,6 +686,8 @@
+ #define OPTION_MCPU 'c'
+ #define OPTION_MOVE_DATA 'd'
+ static bfd_boolean move_data = FALSE;
++#define OPTION_DATA_REGION 'r'
++static bfd_boolean upper_data_region_in_use = FALSE;
+ 
+ enum
+ {
+@@ -710,7 +719,7 @@
+ /* This is a copy of the same data structure found in gcc/config/msp430/msp430.c
+    Keep these two structures in sync.
+    The data in this structure has been extracted from the devices.csv file
+-   released by TI, updated as of 8 October 2015.  */
++   released by TI, updated as of June 2016.  */
+ 
+ struct msp430_mcu_data
+ {
+@@ -1130,13 +1139,27 @@
+   { "msp430fg477",0,0 },
+   { "msp430fg478",0,0 },
+   { "msp430fg479",0,0 },
++  { "msp430fg4617",1,1 },
++  { "msp430fg4618",1,1 },
++  { "msp430fg4619",1,1 },
++  { "msp430fg477",0,0 },
++  { "msp430fg478",0,0 },
++  { "msp430fg479",0,0 },
+   { "msp430fg6425",2,8 },
+   { "msp430fg6426",2,8 },
+   { "msp430fg6625",2,8 },
+   { "msp430fg6626",2,8 },
+   { "msp430fr2032",2,0 },
+   { "msp430fr2033",2,0 },
++  { "msp430fr2110",2,0 },
++  { "msp430fr2111",2,0 },
++  { "msp430fr2310",2,0 },
++  { "msp430fr2311",2,0 },
+   { "msp430fr2433",2,8 },
++  { "msp430fr2532",2,8 },
++  { "msp430fr2533",2,8 },
++  { "msp430fr2632",2,8 },
++  { "msp430fr2633",2,8 },
+   { "msp430fr2xx_4xxgeneric",2,8 },
+   { "msp430fr4131",2,0 },
+   { "msp430fr4132",2,0 },
+@@ -1189,6 +1212,8 @@
+   { "msp430fr5957",2,8 },
+   { "msp430fr5958",2,8 },
+   { "msp430fr5959",2,8 },
++  { "msp430fr5962",2,8 },
++  { "msp430fr5964",2,8 },
+   { "msp430fr5967",2,8 },
+   { "msp430fr5968",2,8 },
+   { "msp430fr5969",2,8 },
+@@ -1201,6 +1226,9 @@
+   { "msp430fr5988",2,8 },
+   { "msp430fr5989",2,8 },
+   { "msp430fr59891",2,8 },
++  { "msp430fr5992",2,8 },
++  { "msp430fr5994",2,8 },
++  { "msp430fr59941",2,8 },
+   { "msp430fr5xx_6xxgeneric",2,8 },
+   { "msp430fr6820",2,8 },
+   { "msp430fr6822",2,8 },
+@@ -1438,6 +1466,12 @@
+     case OPTION_MOVE_DATA:
+       move_data = TRUE;
+       return 1;
++
++    case OPTION_DATA_REGION:
++      if (strcmp (arg, "upper") == 0
++	  || strcmp (arg, "either") == 0)
++	upper_data_region_in_use = TRUE;
++      return 1;
+     }
+ 
+   return 0;
+@@ -1468,14 +1502,19 @@
+ 
+   /* Note - data assigned to the .either.data section may end up being
+      placed in the .upper.data section if the .lower.data section is
+-     full.  Hence the need to define the crt0 symbol.  */
++     full.  Hence the need to define the crt0 symbol.
++     The linker may create upper or either data sections, even when none exist
++     at the moment, so use the value of the data-region flag to determine if
++     the symbol is needed.  */
+   if (strncmp (name, ".either.data", 12) == 0
+-      || strncmp (name, ".upper.data", 11) == 0)
++      || strncmp (name, ".upper.data", 11) == 0
++      || upper_data_region_in_use)
+     (void) symbol_find_or_make ("__crt0_move_highdata");
+ 
+   /* See note about .either.data above.  */
+   if (strncmp (name, ".upper.bss", 10) == 0
+-      || strncmp (name, ".either.bss", 11) == 0)
++      || strncmp (name, ".either.bss", 11) == 0
++      || upper_data_region_in_use)
+     (void) symbol_find_or_make ("__crt0_init_highbss");
+ }
+ 
+@@ -1560,6 +1599,7 @@
+   {"mY", no_argument, NULL, OPTION_NO_WARN_INTR_NOPS},
+   {"my", no_argument, NULL, OPTION_WARN_INTR_NOPS},
+   {"md", no_argument, NULL, OPTION_MOVE_DATA},
++  {"mdata-region", required_argument, NULL, OPTION_DATA_REGION},
+   {NULL, no_argument, NULL, 0}
+ };
+ 
+@@ -1591,6 +1631,9 @@
+ 	   _("  -my - warn about missing NOPs after changing interrupts (default)\n"));
+   fprintf (stream,
+ 	   _("  -md - Force copying of data from ROM to RAM at startup\n"));
++  fprintf (stream,
++	   _("  -mdata-region={none|lower|upper|either} - select region data will be\n"
++	     "    placed in.\n"));
+ }
+ 
+ symbolS *
+@@ -1635,6 +1678,12 @@
+ 		     target_is_430x () ? bfd_mach_msp430x : bfd_mach_msp11);
+ }
+ 
++static inline bfd_boolean
++is_regname_end (char c)
++{
++  return (c == 0 || ! ISALNUM (c));
++}
++  
+ /* Returns the register number equivalent to the string T.
+    Returns -1 if there is no such register.
+    Skips a leading 'r' or 'R' character if there is one.
+@@ -1643,32 +1692,36 @@
+ static signed int
+ check_reg (char * t)
+ {
+-  signed int val;
++  char * endt;
++  signed long int val;
+ 
+-  if (t == NULL)
++  if (t == NULL || t[0] == 0)
+     return -1;
+ 
+   if (*t == 'r' || *t == 'R')
+     ++t;
+ 
+-  if (strncasecmp (t, "pc", 2) == 0)
++  if (strncasecmp (t, "pc", 2) == 0 && is_regname_end (t[2]))
+     return 0;
+ 
+-  if (strncasecmp (t, "sp", 2) == 0)
++  if (strncasecmp (t, "sp", 2) == 0 && is_regname_end (t[2]))
+     return 1;
+ 
+-  if (strncasecmp (t, "sr", 2) == 0)
++  if (strncasecmp (t, "sr", 2) == 0 && is_regname_end (t[2]))
+     return 2;
+ 
+-  if (*t == '0')
++  if (*t == '0' && is_regname_end (t[1]))
+     return 0;
+ 
+-  val = atoi (t);
++  val = strtol (t, & endt, 0);
+ 
+   if (val < 1 || val > 15)
+     return -1;
+ 
+-  return val;
++  if (is_regname_end (*endt))
++    return val;
++
++  return -1;
+ }
+ 
+ static int
+@@ -1679,6 +1732,7 @@
+ 		   bfd_boolean allow_20bit_values,
+ 		   bfd_boolean constants_allowed)
+ {
++  char * end;
+   char *__tl = l;
+ 
+   /* Check if an immediate #VALUE.  The hash sign should be only at the beginning!  */
+@@ -1735,7 +1789,12 @@
+       op->mode = OP_EXP;
+       op->vshift = vshift;
+ 
+-      parse_exp (__tl, &(op->exp));
++      end = parse_exp (__tl, &(op->exp));
++      if (end != NULL && *end != 0 && *end != ')' )
++	{
++	  as_bad (_("extra characters '%s' at end of immediate expression '%s'"), end, l);
++	  return 1;
++	}
+       if (op->exp.X_op == O_constant)
+ 	{
+ 	  int x = op->exp.X_add_number;
+@@ -1932,7 +1991,12 @@
+       op->am = 1;		/* mode As == 01 bin.  */
+       op->ol = 1;		/* Immediate value followed by instruction.  */
+       __tl = h + 1;
+-      parse_exp (__tl, &(op->exp));
++      end = parse_exp (__tl, &(op->exp));
++      if (end != NULL && *end != 0)
++	{
++	  as_bad (_("extra characters '%s' at the end of absolute operand '%s'"), end, l);
++	  return 1;
++	}
+       op->mode = OP_EXP;
+       op->vshift = 0;
+       if (op->exp.X_op == O_constant)
+@@ -2043,7 +2107,12 @@
+       *h = 0;
+       op->mode = OP_EXP;
+       op->vshift = 0;
+-      parse_exp (__tl, &(op->exp));
++      end = parse_exp (__tl, &(op->exp));
++      if (end != NULL && *end != 0)
++	{
++	  as_bad (_("extra characters '%s' at end of operand '%s'"), end, l);
++	  return 1;
++	}
+       if (op->exp.X_op == O_constant)
+ 	{
+ 	  int x = op->exp.X_add_number;
+@@ -2105,23 +2174,20 @@
+     }
+ 
+   /* Symbolic mode 'mov a, b' == 'mov x(pc), y(pc)'.  */
+-  do
++  op->mode = OP_EXP;
++  op->reg = 0;		/* PC relative... be careful.  */
++  /* An expression starting with a minus sign is a constant, not an address.  */
++  op->am = (*l == '-' ? 3 : 1);
++  op->ol = 1;
++  op->vshift = 0;
++  __tl = l;
++  end = parse_exp (__tl, &(op->exp));
++  if (end != NULL && * end != 0)
+     {
+-      op->mode = OP_EXP;
+-      op->reg = 0;		/* PC relative... be careful.  */
+-      /* An expression starting with a minus sign is a constant, not an address.  */
+-      op->am = (*l == '-' ? 3 : 1);
+-      op->ol = 1;
+-      op->vshift = 0;
+-      __tl = l;
+-      parse_exp (__tl, &(op->exp));
+-      return 0;
++      as_bad (_("extra characters '%s' at end of operand '%s'"), end, l);
++      return 1;
+     }
+-  while (0);
+-
+-  /* Unreachable.  */
+-  as_bad (_("unknown addressing mode for operand %s"), l);
+-  return 1;
++  return 0;
+ }
+ 
+ 
+@@ -2148,7 +2214,7 @@
+       op->am = 1;
+       op->ol = 1;
+       op->vshift = 0;
+-      parse_exp (__tl, &(op->exp));
++      (void) parse_exp (__tl, &(op->exp));
+ 
+       if (op->exp.X_op != O_constant || op->exp.X_add_number != 0)
+ 	{
+@@ -2445,6 +2511,7 @@
+   int insn_length = 0;
+   char l1[MAX_OP_LEN], l2[MAX_OP_LEN];
+   char *frag;
++  char *end;
+   int where;
+   struct msp430_operand_s op1, op2;
+   int res = 0;
+@@ -2457,6 +2524,7 @@
+   bfd_boolean addr_op;
+   const char * error_message;
+   static signed int repeat_count = 0;
++  static bfd_boolean prev_insn_is_nop = FALSE;
+   bfd_boolean fix_emitted;
+ 
+   /* Opcode is the one from opcodes table
+@@ -2656,7 +2724,24 @@
+       switch (opcode->insn_opnumb)
+ 	{
+ 	case 0:
+-	  if (is_opcode ("eint") || is_opcode ("dint"))
++	  if (is_opcode ("eint"))
++	    {
++	      if (! prev_insn_is_nop)
++		{
++		  if (gen_interrupt_nops)
++		    {
++		      frag = frag_more (2);
++		      bfd_putl16 ((bfd_vma) 0x4303 /* NOP */, frag);
++		      dwarf2_emit_insn (2);
++
++		      if (warn_interrupt_nops)
++			as_warn (_("inserting a NOP before EINT"));
++		    }
++		  else if (warn_interrupt_nops)
++		    as_warn (_("a NOP might be needed before the EINT"));
++		}
++	    }
++	  else if (is_opcode ("dint"))
+ 	    check_for_nop |= NOP_CHECK_INTERRUPT;
+ 
+ 	  /* Set/clear bits instructions.  */
+@@ -3058,7 +3143,12 @@
+ 		as_bad (_("expected #n as first argument of %s"), opcode->name);
+ 		break;
+ 	      }
+-	    parse_exp (l1 + 1, &(op1.exp));
++	    end = parse_exp (l1 + 1, &(op1.exp));
++	    if (end != NULL && *end != 0)
++	      {
++		as_bad (_("extra characters '%s' at end of constant expression '%s'"), end, l1);
++		break;
++	      }
+ 	    if (op1.exp.X_op != O_constant)
+ 	      {
+ 		as_bad (_("expected constant expression for first argument of %s"),
+@@ -3129,7 +3219,12 @@
+ 		as_bad (_("expected #n as first argument of %s"), opcode->name);
+ 		break;
+ 	      }
+-	    parse_exp (l1 + 1, &(op1.exp));
++	    end = parse_exp (l1 + 1, &(op1.exp));
++	    if (end != NULL && *end != 0)
++	      {
++		as_bad (_("extra characters '%s' at end of operand '%s'"), end, l1);
++		break;
++	      }
+ 	    if (op1.exp.X_op != O_constant)
+ 	      {
+ 		as_bad (_("expected constant expression for first argument of %s"),
+@@ -3249,7 +3344,12 @@
+ 
+ 	    if (*l1 == '#')
+ 	      {
+-		parse_exp (l1 + 1, &(op1.exp));
++		end = parse_exp (l1 + 1, &(op1.exp));
++		if (end != NULL && *end != 0)
++		  {
++		    as_bad (_("extra characters '%s' at end of operand '%s'"), end, l1);
++		    break;
++		  }
+ 
+ 		if (op1.exp.X_op == O_constant)
+ 		  {
+@@ -3361,7 +3461,12 @@
+ 	  /* The RPT instruction only accepted immediates and registers.  */
+ 	  if (*l1 == '#')
+ 	    {
+-	      parse_exp (l1 + 1, &(op1.exp));
++	      end = parse_exp (l1 + 1, &(op1.exp));
++	      if (end != NULL && *end != 0)
++		{
++		  as_bad (_("extra characters '%s' at end of operand '%s'"), end, l1);
++		  break;
++		}
+ 	      if (op1.exp.X_op != O_constant)
+ 		{
+ 		  as_bad (_("expected constant value as argument to RPT"));
+@@ -3726,7 +3831,12 @@
+ 	  if (*m == '$')
+ 	    m++;
+ 
+-	  parse_exp (m, &exp);
++	  end = parse_exp (m, &exp);
++	  if (end != NULL && *end != 0)
++	    {
++	      as_bad (_("extra characters '%s' at end of operand '%s'"), end, l1);
++	      break;
++	    }
+ 
+ 	  /* In order to handle something like:
+ 
+@@ -3820,7 +3930,12 @@
+ 	  if (*m == '#' || *m == '$')
+ 	    m++;
+ 
+-	  parse_exp (m, & exp);
++	  end = parse_exp (m, & exp);
++	  if (end != NULL && *end != 0)
++	    {
++	      as_bad (_("extra characters '%s' at end of operand '%s'"), end, l1);
++	      break;
++	    }
+ 	  if (exp.X_op == O_symbol)
+ 	    {
+ 	      /* Relaxation required.  */
+@@ -3866,7 +3981,12 @@
+ 	  if (*m == '#' || *m == '$')
+ 	    m++;
+ 
+-	  parse_exp (m, & exp);
++	  end = parse_exp (m, & exp);
++	  if (end != NULL && *end != 0)
++	    {
++	      as_bad (_("extra characters '%s' at end of operand '%s'"), end, l1);
++	      break;
++	    }
+ 	  if (exp.X_op == O_symbol)
+ 	    {
+ 	      /* Relaxation required.  */
+@@ -3897,6 +4017,11 @@
+       as_bad (_("Illegal instruction or not implemented opcode."));
+     }
+ 
++  if (is_opcode ("nop"))
++    prev_insn_is_nop = TRUE;
++  else
++    prev_insn_is_nop = FALSE;
++	    
+   input_line_pointer = line;
+   return 0;
+ }
+diff -ruN binutils-2.26/gas/config/tc-msp430.h binutils-2.26-msp430/gas/config/tc-msp430.h
+--- binutils-2.26/gas/config/tc-msp430.h	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/gas/config/tc-msp430.h	2019-06-25 02:25:14.418837153 -0700
+@@ -171,3 +171,5 @@
+ #define DWARF2_USE_FIXED_ADVANCE_PC 1
+ 
+ #define TC_LINKRELAX_FIXUP(seg) ((seg->flags & SEC_CODE) || (seg->flags & SEC_DEBUGGING))
++
++#define DWARF2_ADDR_SIZE(bfd) 4
+diff -ruN binutils-2.26/gas/doc/c-msp430.texi binutils-2.26-msp430/gas/doc/c-msp430.texi
+--- binutils-2.26/gas/doc/c-msp430.texi	2016-01-25 00:51:06.000000000 -0800
++++ binutils-2.26-msp430/gas/doc/c-msp430.texi	2019-06-25 02:25:14.418837153 -0700
+@@ -107,6 +107,19 @@
+ mark the object file as one that requires data to copied from ROM to
+ RAM at execution startup.  Disabled by default.
+ 
++@item -mdata-region=@var{region}
++Select the region data will be placed in.
++Region placement is performed by the compiler and linker.  The only effect this
++option will have on the assembler is that if @var{upper} or @var{either} is
++selected, then the symbols to initialise high data and bss will be defined.
++Valid @var{region} values are:
++@table @code
++@item none
++@item lower
++@item upper
++@item either
++@end table
++
+ @end table
+ 
+ @node MSP430 Syntax
+diff -ruN binutils-2.26/gas/testsuite/gas/msp430/bad.l binutils-2.26-msp430/gas/testsuite/gas/msp430/bad.l
+--- binutils-2.26/gas/testsuite/gas/msp430/bad.l	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/gas/testsuite/gas/msp430/bad.l	2019-06-25 02:25:14.422837123 -0700
+@@ -5,11 +5,13 @@
+ [^:]*:9: Error: junk found after instruction: mov.cd r1,r2
+ [^:]*:10: Warning: no size modifier after period, .w assumed
+ [^:]*:11: Error: instruction bis.a does not exist
+-[^:]*:19: Warning: a NOP might be needed here because of successive changes in interrupt state
+-[^:]*:20: Warning: a NOP might be needed here because of successive changes in interrupt state
+-[^:]*:23: Warning: a NOP might be needed here because of successive changes in interrupt state
++[^:]*:16: Warning: a NOP might be needed here because of successive changes in interrupt state
++[^:]*:16: Warning: a NOP might be needed before the EINT
+ [^:]*:25: Warning: a NOP might be needed here because of successive changes in interrupt state
+-[^:]*:26: Warning: a NOP might be needed here because of successive changes in interrupt state
+-[^:]*:27: Warning: a NOP might be needed here because of successive changes in interrupt state
+-[^:]*:28: Warning: a NOP might be needed here because of successive changes in interrupt state
++[^:]*:25: Warning: a NOP might be needed before the EINT
++[^:]*:29: Warning: a NOP might be needed here because of successive changes in interrupt state
++[^:]*:31: Warning: a NOP might be needed here because of successive changes in interrupt state
++[^:]*:32: Warning: a NOP might be needed here because of successive changes in interrupt state
++[^:]*:33: Warning: a NOP might be needed here because of successive changes in interrupt state
++[^:]*:34: Warning: a NOP might be needed here because of successive changes in interrupt state
+ [^:]*: Warning: assembly finished without a possibly needed NOP instruction
+diff -ruN binutils-2.26/gas/testsuite/gas/msp430/bad.s binutils-2.26-msp430/gas/testsuite/gas/msp430/bad.s
+--- binutils-2.26/gas/testsuite/gas/msp430/bad.s	2014-10-14 00:32:03.000000000 -0700
++++ binutils-2.26-msp430/gas/testsuite/gas/msp430/bad.s	2019-06-25 02:25:14.422837123 -0700
+@@ -11,6 +11,12 @@
+ 	bis.a	#8, r2
+ 
+ ;;; FIXME: Add more tests of assembler error detection here.
++
++	;;  A NOP is needed *before* an EINT instruction.
++	eint
++	nop
++	;; And *after* a DINT instruction.
++	dint
+ 	
+ 	;;  Changing interrupt states in two successive instructions
+ 	;;  might cause an interrupt to be missed.  The assembler
+diff -ruN binutils-2.26/gas/testsuite/gas/msp430/high-data-bss-sym.d binutils-2.26-msp430/gas/testsuite/gas/msp430/high-data-bss-sym.d
+--- binutils-2.26/gas/testsuite/gas/msp430/high-data-bss-sym.d	1969-12-31 16:00:00.000000000 -0800
++++ binutils-2.26-msp430/gas/testsuite/gas/msp430/high-data-bss-sym.d	2019-06-25 02:25:14.422837123 -0700
+@@ -0,0 +1,6 @@
++#objdump: -t
++#name: Check symbols to initialise high data and high bss have been defined
++#...
++.*__crt0_move_highdata.*
++.*__crt0_init_highbss.*
++#pass
+diff -ruN binutils-2.26/gas/testsuite/gas/msp430/high-data-bss-sym.s binutils-2.26-msp430/gas/testsuite/gas/msp430/high-data-bss-sym.s
+--- binutils-2.26/gas/testsuite/gas/msp430/high-data-bss-sym.s	1969-12-31 16:00:00.000000000 -0800
++++ binutils-2.26-msp430/gas/testsuite/gas/msp430/high-data-bss-sym.s	2019-06-25 02:25:14.422837123 -0700
+@@ -0,0 +1,19 @@
++	.file	"main.c"
++.text
++	.balign 2
++	.global	main
++	.type	main, @function
++main:
++; start of function
++; framesize_regs:     0
++; framesize_locals:   0
++; framesize_outgoing: 0
++; framesize:          0
++; elim ap -> fp       2
++; elim fp -> sp       0
++; saved regs:(none)
++	; start of prologue
++	; end of prologue
++.L2:
++	BR	#.L2
++	.size	main, .-main
+diff -ruN binutils-2.26/gas/testsuite/gas/msp430/msp430.exp binutils-2.26-msp430/gas/testsuite/gas/msp430/msp430.exp
+--- binutils-2.26/gas/testsuite/gas/msp430/msp430.exp	2015-11-13 00:27:41.000000000 -0800
++++ binutils-2.26-msp430/gas/testsuite/gas/msp430/msp430.exp	2019-06-25 02:25:14.422837123 -0700
+@@ -24,4 +24,7 @@
+     run_dump_test "bad"
+     run_dump_test "errata_warns"
+     run_dump_test "errata_fixes"
++    run_dump_test "high-data-bss-sym" { { as "-mdata-region=upper" } }
++    run_dump_test "high-data-bss-sym" { { as "-mdata-region=either" } }
++    run_dump_test "pr22133"
+ }
+diff -ruN binutils-2.26/gas/testsuite/gas/msp430/msp430x.d binutils-2.26-msp430/gas/testsuite/gas/msp430/msp430x.d
+--- binutils-2.26/gas/testsuite/gas/msp430/msp430x.d	2014-10-14 00:32:03.000000000 -0700
++++ binutils-2.26-msp430/gas/testsuite/gas/msp430/msp430x.d	2019-06-25 02:25:14.422837123 -0700
+@@ -105,123 +105,123 @@
+ 0+021a <[^>]*> 40 1d b0 40 de bc 00 00 	movx.w	#-344866,0x00000	;0xabcde, PC rel. 0x00220
+ 0+0222 <[^>]*> 40 18 90 40 00 00 00 00 	movx.w	0x00000,0x00000	;PC rel. 0x00226, PC rel. 0x00228
+ 0+022a <[^>]*> 40 18 0f 73 	sbcx.w	r15		;
+-0+022e <[^>]*> 00 18 40 73 	sbcx.a	r0		;
+-0+0232 <[^>]*> 40 18 4f 73 	sbcx.b	r15		;
+-0+0236 <[^>]*> 40 18 87 73 00 00 	sbcx.w	0\(r7\)		;
+-0+023c <[^>]*> 40 18 0f 7f 	subcx.w	r15,	r15	;
+-0+0240 <[^>]*> 80 18 7f 70 45 23 	subcx.a	#74565,	r15	;0x12345
+-0+0246 <[^>]*> 40 18 4f 7f 	subcx.b	r15,	r15	;
+-0+024a <[^>]*> 40 18 b7 75 00 00 	subcx.w	@r5\+,	0\(r7\)	;
+-0+0250 <[^>]*> 40 18 10 86 02 00 	subx.w	2\(r6\),	r0	;
+-0+0256 <[^>]*> 00 18 f0 80 67 11 00 00 	subx.a	#4455,	0x00000	;0x01167, PC rel. 0x0025c
+-0+025e <[^>]*> 40 18 50 86 02 00 	subx.b	2\(r6\),	r0	;
+-0+0264 <[^>]*> 40 18 10 86 02 00 	subx.w	2\(r6\),	r0	;
+-0+026a <[^>]*> 40 18 80 93 00 00 	cmpx.w	#0,	0x00000	;r3 As==00, PC rel. 0x0026e
+-0+0270 <[^>]*> 00 18 c0 93 00 00 	cmpx.a	#0,	0x00000	;r3 As==00, PC rel. 0x00274
+-0+0276 <[^>]*> 40 18 c0 93 00 00 	cmpx.b	#0,	0x00000	;r3 As==00, PC rel. 0x0027a
+-0+027c <[^>]*> 40 18 80 93 00 00 	cmpx.w	#0,	0x00000	;r3 As==00, PC rel. 0x00280
+-0+0282 <[^>]*> 40 18 b0 e0 5a 5a 00 00 	xorx.w	#23130,	0x00000	;0x05a5a, PC rel. 0x00288
+-0+028a <[^>]*> 40 18 90 e2 00 00 00 00 	xorx.w	&0x00000,0x00000	; PC rel. 0x00290
+-0+0292 <[^>]*> 40 18 a0 e8 00 00 	xorx.w	@r8,	0x00000	; PC rel. 0x00296
+-0+0298 <[^>]*> 40 18 80 e8 00 00 	xorx.w	r8,	0x00000	; PC rel. 0x0029c
+-0+029e <[^>]*> 40 18 d0 e6 02 00 00 00 	xorx.b	2\(r6\),	0x00000	; PC rel. 0x002a4
+-0+02a6 <[^>]*> 40 18 f0 e8 00 00 	xorx.b	@r8\+,	0x00000	; PC rel. 0x002aa
+-0+02ac <[^>]*> 00 18 d2 e0 00 00 00 00 	xorx.a	0x00000,&0x00000;PC rel. 0x002b0
+-0+02b4 <[^>]*> 40 18 26 e5 	xorx.w	@r5,	r6	;
+-0+02b8 <[^>]*> 04 18 ff e0 39 30 78 56 	xorx.a	#12345,	284280\(r15\);0x03039, 0x45678
+-0+02c0 <[^>]*> a7 01 45 23 	adda	#74565,	r7	;0x12345
+-0+02c4 <[^>]*> ee 06       	adda	r6,	r14	;
+-0+02c6 <[^>]*> 80 00 00 00 	mova	#0,	r0	;
+-0+02ca <[^>]*> 80 01 44 10 	mova	#69700,	r0	;0x11044
+-0+02ce <[^>]*> c0 05       	mova	r5,	r0	;
+-0+02d0 <[^>]*> 20 00 00 00 	bra	&0		;
+-0+02d4 <[^>]*> 00 05       	bra	@r5		;
+-0+02d6 <[^>]*> 10 05       	bra	@r5\+		;
+-0+02d8 <[^>]*> 30 05 76 98 	bra	-26506\(r5\)	;0xffff9876
+-0+02dc <[^>]*> 45 13       	calla	r5		;
+-0+02de <[^>]*> 56 13 00 00 	calla	0\(r6\)		;0x00000
+-0+02e2 <[^>]*> 67 13       	calla	@r7		;
+-0+02e4 <[^>]*> 78 13       	calla	@r8\+		;
+-0+02e6 <[^>]*> 80 13 00 00 	calla	&0		;0x00000
+-0+02ea <[^>]*> 90 13 00 00 	calla	0\(PC\)		;PC rel. 0x002ec
+-0+02ee <[^>]*> b0 13 00 00 	calla	#0		;0x00000
+-0+02f2 <[^>]*> 40 18 06 43 	clrx.w	r6		;
+-0+02f6 <[^>]*> d2 01       	cmpa	r1,	r2	;
+-0+02f8 <[^>]*> 93 0f cb ed 	cmpa	#1043915,r3	;0xfedcb
+-0+02fc <[^>]*> 40 18 25 83 	decdx.w	r5		;
+-0+0300 <[^>]*> 40 18 25 53 	incdx.w	r5		;
+-0+0304 <[^>]*> c8 09       	mova	r9,	r8	;
+-0+0306 <[^>]*> 8c 01 45 23 	mova	#74565,	r12	;0x12345
+-0+030a <[^>]*> 38 09 00 01 	mova	256\(r9\),r8	;0x00100
+-0+030e <[^>]*> 2c 00 00 00 	mova	&0,	r12	;
+-0+0312 <[^>]*> 08 09       	mova	@r9,	r8	;
+-0+0314 <[^>]*> 18 09       	mova	@r9\+,	r8	;
+-0+0316 <[^>]*> 79 08 00 01 	mova	r8,	256\(r9\)	; 0x00100
+-0+031a <[^>]*> 60 0d 00 00 	mova	r13,	&0	;
+-0+031e <[^>]*> 10 01       	reta			;
+-0+0320 <[^>]*> 00 13       	reti			
+-0+0322 <[^>]*> f6 05       	suba	r5,	r6	;
+-0+0324 <[^>]*> b6 0f ff ff 	suba	#1048575,r6	;0xfffff
+-0+0328 <[^>]*> 40 18 80 93 00 00 	cmpx.w	#0,	0x00000	;r3 As==00, PC rel. 0x0032c
+-0+032e <[^>]*> 05 17       	popm	#1,	r5	;16-bit words
+-0+0330 <[^>]*> 2d 16       	popm.a	#3,	r15	;20-bit words
+-0+0332 <[^>]*> 75 17       	popm	#8,	r12	;16-bit words
+-0+0334 <[^>]*> 40 18 3a 41 	popx.w	r10		;
+-0+0338 <[^>]*> 00 18 7a 41 	popx.a	r10		;
+-0+033c <[^>]*> 40 18 7a 41 	popx.b	r10		;
+-0+0340 <[^>]*> 40 18 3a 41 	popx.w	r10		;
+-0+0344 <[^>]*> 09 15       	pushm	#1,	r9	;16-bit words
+-0+0346 <[^>]*> 19 14       	pushm.a	#2,	r9	;20-bit words
+-0+0348 <[^>]*> 29 15       	pushm	#3,	r9	;16-bit words
+-0+034a <[^>]*> 40 18 08 12 	pushx.w	r8		;
+-0+034e <[^>]*> 00 18 48 12 	pushx.a	r8		;
+-0+0352 <[^>]*> 40 18 52 12 00 00 	pushx.b	&0x0000		;
+-0+0358 <[^>]*> 40 18 08 12 	pushx.w	r8		;
+-0+035c <[^>]*> 5f 02       	rlam	#1,	r15	;
+-0+035e <[^>]*> 4f 06       	rlam.a	#2,	r15	;
+-0+0360 <[^>]*> 5f 0a       	rlam	#3,	r15	;
+-0+0362 <[^>]*> 40 18 06 56 	rlax.w	r6		;
+-0+0366 <[^>]*> 00 18 46 56 	rlax.a	r6		;
+-0+036a <[^>]*> 40 18 06 56 	rlax.w	r6		;
+-0+036e <[^>]*> 40 18 06 66 	rlcx.w	r6		;
+-0+0372 <[^>]*> 00 18 46 66 	rlcx.a	r6		;
+-0+0376 <[^>]*> 40 18 06 66 	rlcx.w	r6		;
+-0+037a <[^>]*> 56 01       	rram	#1,	r6	;
+-0+037c <[^>]*> 46 0d       	rram.a	#4,	r6	;
+-0+037e <[^>]*> 56 05       	rram	#2,	r6	;
+-0+0380 <[^>]*> 40 18 0b 11 	rrax.w	r11		;
+-0+0384 <[^>]*> 00 18 4b 11 	rrax.a	r11		;
+-0+0388 <[^>]*> 40 18 0b 11 	rrax.w	r11		;
+-0+038c <[^>]*> 55 0c       	rrcm	#4,	r5	;
+-0+038e <[^>]*> 45 00       	rrcm.a	#1,	r5	;
+-0+0390 <[^>]*> 55 08       	rrcm	#3,	r5	;
+-0+0392 <[^>]*> 40 18 0d 10 	rrcx.w	r13		;
+-0+0396 <[^>]*> 00 18 4d 10 	rrcx.a	r13		;
+-0+039a <[^>]*> 40 18 0d 10 	rrcx.w	r13		;
+-0+039e <[^>]*> 54 0b       	rrum	#3,	r4	;
+-0+03a0 <[^>]*> 44 07       	rrum.a	#2,	r4	;
+-0+03a2 <[^>]*> 54 03       	rrum	#1,	r4	;
++0+022e <[^>]*> 80 18 c0 73 45 23 	sbcx.a	0x2345		;PC rel. abs addr 0x2577
++0+0234 <[^>]*> 40 18 4f 73 	sbcx.b	r15		;
++0+0238 <[^>]*> 40 18 87 73 00 00 	sbcx.w	0\(r7\)		;
++0+023e <[^>]*> 40 18 0f 7f 	subcx.w	r15,	r15	;
++0+0242 <[^>]*> 80 18 7f 70 45 23 	subcx.a	#74565,	r15	;0x12345
++0+0248 <[^>]*> 40 18 4f 7f 	subcx.b	r15,	r15	;
++0+024c <[^>]*> 40 18 b7 75 00 00 	subcx.w	@r5\+,	0\(r7\)	;
++0+0252 <[^>]*> 40 18 10 86 02 00 	subx.w	2\(r6\),	r0	;
++0+0258 <[^>]*> 00 18 f0 80 67 11 00 00 	subx.a	#4455,	0x00000	;0x01167, PC rel. 0x0025e
++0+0260 <[^>]*> 40 18 50 86 02 00 	subx.b	2\(r6\),	r0	;
++0+0266 <[^>]*> 40 18 10 86 02 00 	subx.w	2\(r6\),	r0	;
++0+026c <[^>]*> 40 18 80 93 00 00 	cmpx.w	#0,	0x00000	;r3 As==00, PC rel. 0x00270
++0+0272 <[^>]*> 00 18 c0 93 00 00 	cmpx.a	#0,	0x00000	;r3 As==00, PC rel. 0x00276
++0+0278 <[^>]*> 40 18 c0 93 00 00 	cmpx.b	#0,	0x00000	;r3 As==00, PC rel. 0x0027c
++0+027e <[^>]*> 40 18 80 93 00 00 	cmpx.w	#0,	0x00000	;r3 As==00, PC rel. 0x00282
++0+0284 <[^>]*> 40 18 b0 e0 5a 5a 00 00 	xorx.w	#23130,	0x00000	;0x05a5a, PC rel. 0x0028a
++0+028c <[^>]*> 40 18 90 e2 00 00 00 00 	xorx.w	&0x00000,0x00000	; PC rel. 0x00292
++0+0294 <[^>]*> 40 18 a0 e8 00 00 	xorx.w	@r8,	0x00000	; PC rel. 0x00298
++0+029a <[^>]*> 40 18 80 e8 00 00 	xorx.w	r8,	0x00000	; PC rel. 0x0029e
++0+02a0 <[^>]*> 40 18 d0 e6 02 00 00 00 	xorx.b	2\(r6\),	0x00000	; PC rel. 0x002a6
++0+02a8 <[^>]*> 40 18 f0 e8 00 00 	xorx.b	@r8\+,	0x00000	; PC rel. 0x002ac
++0+02ae <[^>]*> 00 18 d2 e0 00 00 00 00 	xorx.a	0x00000,&0x00000;PC rel. 0x002b2
++0+02b6 <[^>]*> 40 18 26 e5 	xorx.w	@r5,	r6	;
++0+02ba <[^>]*> 04 18 ff e0 39 30 78 56 	xorx.a	#12345,	284280\(r15\);0x03039, 0x45678
++0+02c2 <[^>]*> a7 01 45 23 	adda	#74565,	r7	;0x12345
++0+02c6 <[^>]*> ee 06       	adda	r6,	r14	;
++0+02c8 <[^>]*> 80 00 00 00 	mova	#0,	r0	;
++0+02cc <[^>]*> 80 01 44 10 	mova	#69700,	r0	;0x11044
++0+02d0 <[^>]*> c0 05       	mova	r5,	r0	;
++0+02d2 <[^>]*> 20 00 00 00 	bra	&0		;
++0+02d6 <[^>]*> 00 05       	bra	@r5		;
++0+02d8 <[^>]*> 10 05       	bra	@r5\+		;
++0+02da <[^>]*> 30 05 76 98 	bra	-26506\(r5\)	;0xffff9876
++0+02de <[^>]*> 45 13       	calla	r5		;
++0+02e0 <[^>]*> 56 13 00 00 	calla	0\(r6\)		;0x00000
++0+02e4 <[^>]*> 67 13       	calla	@r7		;
++0+02e6 <[^>]*> 78 13       	calla	@r8\+		;
++0+02e8 <[^>]*> 80 13 00 00 	calla	&0		;0x00000
++0+02ec <[^>]*> 90 13 00 00 	calla	0\(PC\)		;PC rel. 0x002ee
++0+02f0 <[^>]*> b0 13 00 00 	calla	#0		;0x00000
++0+02f4 <[^>]*> 40 18 06 43 	clrx.w	r6		;
++0+02f8 <[^>]*> d2 01       	cmpa	r1,	r2	;
++0+02fa <[^>]*> 93 0f cb ed 	cmpa	#1043915,r3	;0xfedcb
++0+02fe <[^>]*> 40 18 25 83 	decdx.w	r5		;
++0+0302 <[^>]*> 40 18 25 53 	incdx.w	r5		;
++0+0306 <[^>]*> c8 09       	mova	r9,	r8	;
++0+0308 <[^>]*> 8c 01 45 23 	mova	#74565,	r12	;0x12345
++0+030c <[^>]*> 38 09 00 01 	mova	256\(r9\),r8	;0x00100
++0+0310 <[^>]*> 2c 00 00 00 	mova	&0,	r12	;
++0+0314 <[^>]*> 08 09       	mova	@r9,	r8	;
++0+0316 <[^>]*> 18 09       	mova	@r9\+,	r8	;
++0+0318 <[^>]*> 79 08 00 01 	mova	r8,	256\(r9\)	; 0x00100
++0+031c <[^>]*> 60 0d 00 00 	mova	r13,	&0	;
++0+0320 <[^>]*> 10 01       	reta			;
++0+0322 <[^>]*> 00 13       	reti			
++0+0324 <[^>]*> f6 05       	suba	r5,	r6	;
++0+0326 <[^>]*> b6 0f ff ff 	suba	#1048575,r6	;0xfffff
++0+032a <[^>]*> 40 18 80 93 00 00 	cmpx.w	#0,	0x00000	;r3 As==00, PC rel. 0x0032e
++0+0330 <[^>]*> 05 17       	popm	#1,	r5	;16-bit words
++0+0332 <[^>]*> 2d 16       	popm.a	#3,	r15	;20-bit words
++0+0334 <[^>]*> 75 17       	popm	#8,	r12	;16-bit words
++0+0336 <[^>]*> 40 18 3a 41 	popx.w	r10		;
++0+033a <[^>]*> 00 18 7a 41 	popx.a	r10		;
++0+033e <[^>]*> 40 18 7a 41 	popx.b	r10		;
++0+0342 <[^>]*> 40 18 3a 41 	popx.w	r10		;
++0+0346 <[^>]*> 09 15       	pushm	#1,	r9	;16-bit words
++0+0348 <[^>]*> 19 14       	pushm.a	#2,	r9	;20-bit words
++0+034a <[^>]*> 29 15       	pushm	#3,	r9	;16-bit words
++0+034c <[^>]*> 40 18 08 12 	pushx.w	r8		;
++0+0350 <[^>]*> 00 18 48 12 	pushx.a	r8		;
++0+0354 <[^>]*> 40 18 52 12 00 00 	pushx.b	&0x0000		;
++0+035a <[^>]*> 40 18 08 12 	pushx.w	r8		;
++0+035e <[^>]*> 5f 02       	rlam	#1,	r15	;
++0+0360 <[^>]*> 4f 06       	rlam.a	#2,	r15	;
++0+0362 <[^>]*> 5f 0a       	rlam	#3,	r15	;
++0+0364 <[^>]*> 40 18 06 56 	rlax.w	r6		;
++0+0368 <[^>]*> 00 18 46 56 	rlax.a	r6		;
++0+036c <[^>]*> 40 18 06 56 	rlax.w	r6		;
++0+0370 <[^>]*> 40 18 06 66 	rlcx.w	r6		;
++0+0374 <[^>]*> 00 18 46 66 	rlcx.a	r6		;
++0+0378 <[^>]*> 40 18 06 66 	rlcx.w	r6		;
++0+037c <[^>]*> 56 01       	rram	#1,	r6	;
++0+037e <[^>]*> 46 0d       	rram.a	#4,	r6	;
++0+0380 <[^>]*> 56 05       	rram	#2,	r6	;
++0+0382 <[^>]*> 40 18 0b 11 	rrax.w	r11		;
++0+0386 <[^>]*> 00 18 4b 11 	rrax.a	r11		;
++0+038a <[^>]*> 40 18 0b 11 	rrax.w	r11		;
++0+038e <[^>]*> 55 0c       	rrcm	#4,	r5	;
++0+0390 <[^>]*> 45 00       	rrcm.a	#1,	r5	;
++0+0392 <[^>]*> 55 08       	rrcm	#3,	r5	;
++0+0394 <[^>]*> 40 18 0d 10 	rrcx.w	r13		;
++0+0398 <[^>]*> 00 18 4d 10 	rrcx.a	r13		;
++0+039c <[^>]*> 40 18 0d 10 	rrcx.w	r13		;
++0+03a0 <[^>]*> 54 0b       	rrum	#3,	r4	;
++0+03a2 <[^>]*> 44 07       	rrum.a	#2,	r4	;
+ 0+03a4 <[^>]*> 54 03       	rrum	#1,	r4	;
+-0+03a6 <[^>]*> 47 03       	rrum.a	#1,	r7	;
+-0+03a8 <[^>]*> 45 11       	rra.b	r5		;
+-0+03aa <[^>]*> 75 c0 80 00 	bic.b	#128,	r5	;#0x0080
+-0+03ae <[^>]*> 56 03       	rrum	#1,	r6	;
+-0+03b0 <[^>]*> 40 18 81 10 	swpbx.w	r1		;
+-0+03b4 <[^>]*> 00 18 90 10 00 00 	swpbx.a	0x0000		;PC rel. 0x03b8
+-0+03ba <[^>]*> 40 18 8c 10 	swpbx.w	r12		;
+-0+03be <[^>]*> 40 18 82 11 	sxtx.w	r2		;
+-0+03c2 <[^>]*> 00 18 92 11 00 00 	sxtx.a	&0x0000		;
+-0+03c8 <[^>]*> 40 18 82 11 	sxtx.w	r2		;
+-0+03cc <[^>]*> 04 18 45 11 	rpt #5 \{ rrax.a	r5		;
+-0+03d0 <[^>]*> 85 18 45 11 	rpt r5 \{ rrax.a	r5		;
+-0+03d4 <[^>]*> e2 01       	adda	r1,	r2	;
+-0+03d6 <[^>]*> c0 01       	mova	r1,	r0	;
+-0+03d8 <[^>]*> 41 13       	calla	r1		;
+-0+03da <[^>]*> 40 18 01 43 	clrx.w	r1		;
+-0+03de <[^>]*> d2 01       	cmpa	r1,	r2	;
+-0+03e0 <[^>]*> 40 18 21 83 	decdx.w	r1		;
+-0+03e4 <[^>]*> 40 18 21 53 	incdx.w	r1		;
+-0+03e8 <[^>]*> c2 01       	mova	r1,	r2	;
+-0+03ea <[^>]*> 10 01       	reta			;
+-0+03ec <[^>]*> f2 01       	suba	r1,	r2	;
+-0+03ee <[^>]*> 40 18 80 93 00 00 	cmpx.w	#0,	0x00000	;r3 As==00, PC rel. 0x003f2
++0+03a6 <[^>]*> 54 03       	rrum	#1,	r4	;
++0+03a8 <[^>]*> 47 03       	rrum.a	#1,	r7	;
++0+03aa <[^>]*> 45 11       	rra.b	r5		;
++0+03ac <[^>]*> 75 c0 80 00 	bic.b	#128,	r5	;#0x0080
++0+03b0 <[^>]*> 56 03       	rrum	#1,	r6	;
++0+03b2 <[^>]*> 40 18 81 10 	swpbx.w	r1		;
++0+03b6 <[^>]*> 00 18 90 10 00 00 	swpbx.a	0x0000		;PC rel. 0x03ba
++0+03bc <[^>]*> 40 18 8c 10 	swpbx.w	r12		;
++0+03c0 <[^>]*> 40 18 82 11 	sxtx.w	r2		;
++0+03c4 <[^>]*> 00 18 92 11 00 00 	sxtx.a	&0x0000		;
++0+03ca <[^>]*> 40 18 82 11 	sxtx.w	r2		;
++0+03ce <[^>]*> 04 18 45 11 	rpt #5 { rrax.a	r5		;
++0+03d2 <[^>]*> 85 18 45 11 	rpt r5 { rrax.a	r5		;
++0+03d6 <[^>]*> e2 01       	adda	r1,	r2	;
++0+03d8 <[^>]*> c0 01       	mova	r1,	r0	;
++0+03da <[^>]*> 41 13       	calla	r1		;
++0+03dc <[^>]*> 40 18 01 43 	clrx.w	r1		;
++0+03e0 <[^>]*> d2 01       	cmpa	r1,	r2	;
++0+03e2 <[^>]*> 40 18 21 83 	decdx.w	r1		;
++0+03e6 <[^>]*> 40 18 21 53 	incdx.w	r1		;
++0+03ea <[^>]*> c2 01       	mova	r1,	r2	;
++0+03ec <[^>]*> 10 01       	reta			;
++0+03ee <[^>]*> f2 01       	suba	r1,	r2	;
++0+03f0 <[^>]*> 40 18 80 93 00 00 	cmpx.w	#0,	0x00000	;r3 As==00, PC rel. 0x003f4
+diff -ruN binutils-2.26/gas/testsuite/gas/msp430/pr22133.d binutils-2.26-msp430/gas/testsuite/gas/msp430/pr22133.d
+--- binutils-2.26/gas/testsuite/gas/msp430/pr22133.d	1969-12-31 16:00:00.000000000 -0800
++++ binutils-2.26-msp430/gas/testsuite/gas/msp430/pr22133.d	2019-06-25 02:25:14.422837123 -0700
+@@ -0,0 +1,4 @@
++#name: Extraneous extra text at the end of operands
++#source: pr22133.s
++#as: 
++#error-output: pr22133.l
+diff -ruN binutils-2.26/gas/testsuite/gas/msp430/pr22133.l binutils-2.26-msp430/gas/testsuite/gas/msp430/pr22133.l
+--- binutils-2.26/gas/testsuite/gas/msp430/pr22133.l	1969-12-31 16:00:00.000000000 -0800
++++ binutils-2.26-msp430/gas/testsuite/gas/msp430/pr22133.l	2019-06-25 02:25:14.422837123 -0700
+@@ -0,0 +1,4 @@
++[^:]*: Assembler messages:
++[^:]*:5: Error: extra characters '\(R13\)' at the end of absolute operand '&SRC\(R13\)'
++[^:]*:5: Error: extra characters '\(R13\)' at the end of absolute operand '&DST\(R13\)'
++
+diff -ruN binutils-2.26/gas/testsuite/gas/msp430/pr22133.s binutils-2.26-msp430/gas/testsuite/gas/msp430/pr22133.s
+--- binutils-2.26/gas/testsuite/gas/msp430/pr22133.s	1969-12-31 16:00:00.000000000 -0800
++++ binutils-2.26-msp430/gas/testsuite/gas/msp430/pr22133.s	2019-06-25 02:25:14.422837123 -0700
+@@ -0,0 +1,9 @@
++
++.equiv  SRC,     1800h
++.equiv  DST,     1880h
++
++	mov     &SRC(R13), &DST(R13)
++#	mov     &SRC, &DST
++#	mov     &1800h(R13), &DST(R13)
++#	mov     &1800h(R13), &1800h(R13)
++
+diff -ruN binutils-2.26/ld/ChangeLog binutils-2.26-msp430/ld/ChangeLog
+--- binutils-2.26/ld/ChangeLog	2016-01-25 00:54:11.000000000 -0800
++++ binutils-2.26-msp430/ld/ChangeLog	2019-06-25 02:25:14.422837123 -0700
+@@ -1,3 +1,109 @@
++2016-03-10  Nick Clifton  <nickc@redhat.com>
++
++	* scripttempl/elf32msp430.sc (.rodata): Remove spurious LONG(0).
++
++2016-01-05  Nick Clifton  <nickc@redhat.com>
++
++	* emulparams/msp430elf.sh (RAM_START): Move to 0x500 - above the
++	MSP430 hardware multiply address range.
++	* scripttempl/elf32msp430.sc (__romdatastart): Define.
++	(__romdatacopysize): Define.
++	* scripttempl/elf32msp430_3.sc: Likewise.
++
++2017-09-02  Alan Modra  <amodra@gmail.com>
++
++	* emultempl/msp430.em (eval_upper_either_sections): Make base_sec_name
++	a const char*.
++	(eval_lower_either_sections): Likewise.
++	(msp430_elf_after_allocation): Likewise, and don't needlessly concat
++	and free.  Warning fix.
++
++2017-08-29  Jozef Lawrynowicz  <jozef.l@somniumtech.com>
++
++	* emultempl/msp430.em (change_output_section): New function.
++	(move_prefixed_section): New function.
++	(add_region_prefix): New function.
++	(msp430_elf_after_open): New function.
++	(gld${EMULATION_NAME}_add_options): Implement.
++	(gld${EMULATION_NAME}_list_options): Implement.
++	(gld${EMULATION_NAME}_handle_option): Implement.
++	* ld.texinfo: Document new options.
++	* testsuite/ld-msp430-elf/main-bss-lower.d: New.
++	* testsuite/ld-msp430-elf/main-bss-upper.d: New.
++	* testsuite/ld-msp430-elf/main-const-lower.d: New.
++	* testsuite/ld-msp430-elf/main-const-upper.d: New.
++	* testsuite/ld-msp430-elf/main-text-lower.d: New.
++	* testsuite/ld-msp430-elf/main-text-upper.d: New.
++	* testsuite/ld-msp430-elf/main-var-lower.d: New.
++	* testsuite/ld-msp430-elf/main-var-upper.d: New.
++	* testsuite/ld-msp430-elf/main-with-data-bss-unique-sec.s: New.
++	* testsuite/ld-msp430-elf/main-with-data-bss.s: New.
++	* testsuite/ld-msp430-elf/main-with-text-rodata-unique-sec.s: New.
++	* testsuite/ld-msp430-elf/main-with-text-rodata.s: New.
++	* testsuite/ld-msp430-elf/msp430-elf.exp: New.
++	* testsuite/ld-msp430-elf/msp430-no-lower.ld: New.
++	* testsuite/ld-msp430-elf/msp430.ld: New.
++	* emultempl/msp430.em (data_statement_size): New.
++	(eval_upper_either_sections): New.
++	(eval_lower_either_sections): New.
++	(intermediate_relax_sections): New.
++	(msp430_elf_after_allocation): New.
++	* emultempl/msp430.em (gld${EMULATION_NAME}_place_orphan): Always
++	place sections in the lower region.
++
++2016-03-10  Nick Clifton  <nickc@redhat.com>
++
++	* scripttempl/elf32msp430.sc (.rodata): Remove spurious LONG(0).
++
++2016-04-07  Nick Clifton  <nickc@redhat.com>
++
++	* scripttempl/elf32msp430.sc (.MSP430.attributes): Fix typo in
++	section name.
++	* scripttempl/elf32msp430_3.sc (.MSP430.attributes): Likewise.
++
++2016-05-25  Maciej W. Rozycki  <macro@imgtec.com>
++
++	* testsuite/ld-mips-elf/unaligned-jalx-0.d: New test.
++	* testsuite/ld-mips-elf/unaligned-jalx-1.d: New test.
++	* testsuite/ld-mips-elf/unaligned-jalx-2.d: New test.
++	* testsuite/ld-mips-elf/unaligned-jalx-mips16-0.d: New test.
++	* testsuite/ld-mips-elf/unaligned-jalx-mips16-1.d: New test.
++	* testsuite/ld-mips-elf/unaligned-jalx-mips16-2.d: New test.
++	* testsuite/ld-mips-elf/unaligned-jalx-micromips-0.d: New test.
++	* testsuite/ld-mips-elf/unaligned-jalx-micromips-1.d: New test.
++	* testsuite/ld-mips-elf/unaligned-jalx-micromips-2.d: New test.
++	* testsuite/ld-mips-elf/unaligned-lwpc-0.d: New test.
++	* testsuite/ld-mips-elf/unaligned-lwpc-1.d: New test.
++	* testsuite/ld-mips-elf/unaligned-lwpc-2.d: New test.
++	* testsuite/ld-mips-elf/unaligned-lwpc-3.d: New test.
++	* testsuite/ld-mips-elf/unaligned-ldpc-0.d: New test.
++	* testsuite/ld-mips-elf/unaligned-ldpc-1.d: New test.
++	* testsuite/ld-mips-elf/unaligned-ldpc-2.d: New test.
++	* testsuite/ld-mips-elf/unaligned-ldpc-3.d: New test.
++	* testsuite/ld-mips-elf/unaligned-ldpc-4.d: New test.
++	* testsuite/ld-mips-elf/unaligned-jalx-0.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-jalx-1.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-jalx-2.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-insn.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-lwpc-0.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-lwpc-1.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-lwpc-2.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-lwpc-3.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-ldpc-0.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-ldpc-1.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-ldpc-2.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-ldpc-3.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-ldpc-4.s: New test source.
++	* testsuite/ld-mips-elf/unaligned-syms.s: New test source.
++	* testsuite/ld-mips-elf/mips-elf.exp: Run the new tests.
++
++2016-05-26  Nick Clifton  <nickc@redhat.com>
++
++	PR target/20134
++	* scripttempl/elf32msp430.sc (.bss): Provide __bssstart and
++	__bsssize.
++	* scripttempl/elf32msp430_3.sc (.bss): Likewise.
++
+ 2016-01-25  Tristan Gingold  <gingold@adacore.com>
+ 
+ 	* configure: Regenerate.
+diff -ruN binutils-2.26/ld/emulparams/msp430elf.sh binutils-2.26-msp430/ld/emulparams/msp430elf.sh
+--- binutils-2.26/ld/emulparams/msp430elf.sh	2015-11-13 00:27:42.000000000 -0800
++++ binutils-2.26-msp430/ld/emulparams/msp430elf.sh	2019-06-25 02:25:14.422837123 -0700
+@@ -13,6 +13,6 @@
+ ARCH=msp:14
+ ROM_START=0x8000
+ ROM_SIZE=0x7fe0
+-RAM_START=0x0200
++RAM_START=0x0500
+ RAM_SIZE=1K
+ STACK=0x600
+diff -ruN binutils-2.26/ld/emultempl/msp430.em binutils-2.26-msp430/ld/emultempl/msp430.em
+--- binutils-2.26/ld/emultempl/msp430.em	2015-11-13 00:27:42.000000000 -0800
++++ binutils-2.26-msp430/ld/emultempl/msp430.em	2019-06-25 02:25:14.422837123 -0700
+@@ -32,6 +32,7 @@
+ #include "bfdlink.h"
+ 
+ #include "ld.h"
++#include "getopt.h"
+ #include "ldmain.h"
+ #include "ldmisc.h"
+ #include "ldexp.h"
+@@ -39,6 +40,29 @@
+ #include "ldfile.h"
+ #include "ldemul.h"
+ #include "libiberty.h"
++#include <ldgram.h>
++
++enum regions
++{
++  REGION_NONE = 0,
++  REGION_LOWER,
++  REGION_UPPER,
++  REGION_EITHER = 3,
++};
++
++enum either_placement_stage
++{
++  LOWER_TO_UPPER,
++  UPPER_TO_LOWER,
++};
++
++enum { ROM, RAM };
++
++static int data_region = REGION_NONE;
++static int code_region = REGION_NONE;
++static bfd_boolean disable_sec_transformation = FALSE;
++
++#define MAX_PREFIX_LENGTH 7
+ 
+ EOF
+ 
+@@ -124,6 +148,32 @@
+ if test x"$LDEMUL_PLACE_ORPHAN" != xgld"$EMULATION_NAME"_place_orphan; then
+ fragment <<EOF
+ 
++static unsigned int
++data_statement_size (lang_data_statement_type *d)
++{
++  unsigned int size = 0;
++  switch (d->type)
++    {
++    case QUAD:
++    case SQUAD:
++      size = QUAD_SIZE;
++      break;
++    case LONG:
++      size = LONG_SIZE;
++      break;
++    case SHORT:
++      size = SHORT_SIZE;
++      break;
++    case BYTE:
++      size = BYTE_SIZE;
++      break;
++    default:
++      einfo ("%P: error: unhandled data_statement size\n");
++      FAIL ();
++    }
++  return size;
++}
++
+ /* Helper function for place_orphan that computes the size
+    of sections already mapped to the given statement.  */
+ 
+@@ -143,12 +193,17 @@
+ 
+ 	case lang_constructors_statement_enum:
+ 	case lang_assignment_statement_enum:
++	case lang_padding_statement_enum:
+ 	  break;
+ 
+ 	case lang_wild_statement_enum:
+ 	  amount += scan_children (l->wild_statement.children.head);	  
+ 	  break;
+ 
++	case lang_data_statement_enum:
++	  amount += data_statement_size (&l->data_statement);
++	  break;
++
+ 	default:
+ 	  fprintf (stderr, "msp430 orphan placer: unhandled lang type %d\n", l->header.type);
+ 	  break;
+@@ -173,7 +228,6 @@
+   char * name;
+   lang_output_section_statement_type * lower;
+   lang_output_section_statement_type * upper;
+-  lang_output_section_statement_type * os;
+ 
+   if ((s->flags & SEC_ALLOC) == 0)
+     return NULL;
+@@ -197,70 +251,595 @@
+      only use the part of the name before the second dot.  */
+   if (strchr (secname + 1, '.') != NULL)
+     {
+-      name = ACONCAT ((secname, NULL));
++      name = concat (secname, NULL);
+ 
+       * strchr (name + 1, '.') = 0;
+     }
+   else
+     name = (char *) secname;
+   
+-  lower_name = ACONCAT ((".lower", name, NULL));
+-  upper_name = ACONCAT ((".upper", name, NULL));
++  lower_name = concat (".lower", name, NULL);
++  upper_name = concat (".upper", name, NULL);
+ 
+   /* Find the corresponding lower and upper sections.  */
+   lower = lang_output_section_find (lower_name);
+   upper = lang_output_section_find (upper_name);
+-  /* If the upper section does not exist, try again without the suffix.  */
+-  if (upper == NULL)
+-    upper = lang_output_section_find (name);
+ 
+-  if (lower == NULL)
++  if (lower == NULL && upper == NULL)
+     {
+-      os = upper;
+-      if (upper == NULL)
+-        {
+-          einfo ("%P: error: no section named %s or %s in linker script\n", lower_name, upper_name);
+-	  return NULL;
+-	}
+-    }
+-  else if (upper == NULL)
+-    os = lower;
+-  else if (lower->region == NULL)
+-    os = lower;
+-  /* If the section is too big for the region containing
+-     the lower section then do not even try to use it.  */
+-  else if (lower->region->length < s->size)
+-    os = upper;
++      einfo ("%P: error: no section named %s or %s in linker script\n",
++	     lower_name, upper_name);
++      goto end;
++    }
++  else if (lower == NULL)
++    {
++      lower = lang_output_section_find (name);
++      if (lower == NULL)
++	{
++	  einfo ("%P: error: no section named %s in linker script\n", name);
++	  goto end;
++	}
++    }
++
++  /* Always place orphaned sections in lower.  Optimal placement of either
++     sections is performed later, once section sizes have been finalized.  */
++  lang_add_section (& lower->children, s, NULL, lower);
++ end:
++  free (upper_name);
++  free (lower_name);
++  return lower;
++}
++EOF
++fi
++
++fragment <<EOF
++
++static bfd_boolean
++change_output_section (lang_statement_union_type ** head,
++		       asection *s,
++		       lang_output_section_statement_type * new_output_section)
++{
++  asection *is;
++  lang_statement_union_type * prev = NULL;
++  lang_statement_union_type * curr;
++
++  curr = *head;
++  while (curr != NULL)
++    {
++      switch (curr->header.type)
++	{
++	case lang_input_section_enum:
++	  is = curr->input_section.section;
++	  if (is == s)
++	    {
++	      s->output_section = NULL;
++	      lang_add_section (& (new_output_section->children), s, NULL,
++				new_output_section);
++	      /* Remove the section from the old output section.  */
++	      if (prev == NULL)
++		*head = curr->header.next;
++	      else
++		prev->header.next = curr->header.next;
++	      return TRUE;
++	    }
++	  break;
++	case lang_wild_statement_enum:
++	  if (change_output_section (&(curr->wild_statement.children.head),
++				     s, new_output_section))
++	    return TRUE;
++	  break;
++	default:
++	  break;
++	}
++      prev = curr;
++      curr = curr->header.next;
++    }
++  return FALSE;
++}
++
++static void
++move_prefixed_section (asection *s, char *new_name,
++		       lang_output_section_statement_type * new_output_sec)
++{
++  s->name = new_name;
++  if (s->output_section == NULL)
++    lang_add_section (& (new_output_sec->children), s, NULL, new_output_sec);
+   else
+     {
+-      bfd_size_type amount = 0;
+-      struct lang_output_section_statement_struct * p;
++      lang_output_section_statement_type * curr_output_sec
++	= lang_output_section_find (s->output_section->name);
++      change_output_section (&(curr_output_sec->children.head), s,
++			     new_output_sec);
++    }
++}
+ 
+-      amount += scan_children (lower->children.head);
++/* Warn only once per output section.  */
++static void
++warn_no_output_section(const char *base_name, char *new_name)
++{
++  static bfd_boolean warned_text = FALSE;
++  static bfd_boolean warned_data = FALSE;
++  static bfd_boolean warned_bss = FALSE;
++  static bfd_boolean warned_rodata = FALSE;
++
++  if (strcmp (base_name, ".text") == 0 && !warned_text)
++    warned_text = TRUE;
++  else if (strcmp (base_name, ".data") == 0 && !warned_data)
++    warned_data = TRUE;
++  else if (strcmp (base_name, ".bss") == 0 && !warned_bss)
++    warned_bss = TRUE;
++  else if (strcmp (base_name, ".rodata") == 0 && !warned_rodata)
++    warned_rodata = TRUE;
++  else
++    return;
++  einfo ("%P: warning: cannot move section from %s to %s. "
++	 "No section named %s in linker script\n",
++	 base_name, new_name, new_name);
++}
+ 
+-      /* Also check forwards for other statements assigned to the same region.  */
+-      for (p = lower->next; p != NULL; p = p->next)
+-	if (p->region == lower->region)
+-	  amount += scan_children (p->children.head);
+-
+-      /* Scan backwards as well.  */      
+-      for (p = lower->prev; p != NULL; p = p->prev)
+-	if (p->region == lower->region)
+-	  amount += scan_children (p->children.head);
++static void
++add_region_prefix (bfd *abfd, asection *s,
++		   ATTRIBUTE_UNUSED void *unused)
++{
++  const char *curr_name = bfd_get_section_name (abfd, s);
++  const char * base_name;
++  char * new_input_sec_name = NULL;
++  char * new_output_sec_name = NULL;
++  int region = REGION_NONE;
+ 
+-      if (amount + s->size >= lower->region->length)
+-	os = upper;
++  if (strncmp (curr_name, ".text", 5) == 0)
++    {
++      region = code_region;
++      base_name = ".text";
++    }
++  else if (strncmp (curr_name, ".data", 5) == 0)
++    {
++      region = data_region;
++      base_name = ".data";
++    }
++  else if (strncmp (curr_name, ".bss", 4) == 0)
++    {
++      region = data_region;
++      base_name = ".bss";
++    }
++  else if (strncmp (curr_name, ".rodata", 7) == 0)
++    {
++      region = data_region;
++      base_name = ".rodata";
++    }
++  else
++    return;
++
++  switch (region)
++    {
++    case REGION_NONE:
++      break;
++    case REGION_UPPER:
++      new_input_sec_name = concat (".upper", curr_name, NULL);
++      new_output_sec_name = concat (".upper", base_name, NULL);
++      lang_output_section_statement_type * upper
++	= lang_output_section_find (new_output_sec_name);
++      if (upper != NULL)
++	move_prefixed_section (s, new_input_sec_name, upper);
+       else
+-	os = lower;
++	warn_no_output_section(base_name, new_output_sec_name);
++      break;
++    case REGION_LOWER:
++      new_input_sec_name = concat (".lower", curr_name, NULL);
++      new_output_sec_name = concat (".lower", base_name, NULL);
++      lang_output_section_statement_type * lower
++	= lang_output_section_find (new_output_sec_name);
++      if (lower != NULL)
++	move_prefixed_section (s, new_input_sec_name, lower);
++      else
++	warn_no_output_section(base_name, new_output_sec_name);
++      break;
++    case REGION_EITHER:
++      s->name = concat (".either", curr_name, NULL);
++      break;
++    default:
++      /* Unreachable.  */
++      FAIL ();
++      break;
+     }
++}
+ 
+-  lang_add_section (& os->children, s, NULL, os);
+-  return os;
++static void
++msp430_elf_after_open (void)
++{
++  bfd *abfd;
++
++  gld${EMULATION_NAME}_after_open ();
++
++  /* If neither --code-region or --data-region have been passed, do not
++     transform sections names.  */
++  if ((code_region == REGION_NONE && data_region == REGION_NONE)
++      || disable_sec_transformation)
++    return;
++
++  for (abfd = link_info.input_bfds; abfd != NULL; abfd = abfd->link.next)
++    bfd_map_over_sections (abfd, add_region_prefix, NULL);
+ }
+-EOF
+-fi
+ 
+-fragment <<EOF
++#define OPTION_CODE_REGION		321
++#define OPTION_DATA_REGION		(OPTION_CODE_REGION + 1)
++#define OPTION_DISABLE_TRANS		(OPTION_CODE_REGION + 2)
++
++static void
++gld${EMULATION_NAME}_add_options
++  (int ns, char **shortopts, int nl, struct option **longopts,
++   int nrl ATTRIBUTE_UNUSED, struct option **really_longopts ATTRIBUTE_UNUSED)
++{
++  static const char xtra_short[] = { };
++
++  static const struct option xtra_long[] =
++    {
++      { "code-region", required_argument, NULL, OPTION_CODE_REGION },
++      { "data-region", required_argument, NULL, OPTION_DATA_REGION },
++      { "disable-sec-transformation", no_argument, NULL,
++	OPTION_DISABLE_TRANS },
++      { NULL, no_argument, NULL, 0 }
++    };
++
++  *shortopts = (char *) xrealloc (*shortopts, ns + sizeof (xtra_short));
++  memcpy (*shortopts + ns, &xtra_short, sizeof (xtra_short));
++  *longopts = (struct option *)
++    xrealloc (*longopts, nl * sizeof (struct option) + sizeof (xtra_long));
++  memcpy (*longopts + nl, &xtra_long, sizeof (xtra_long));
++}
++
++static void
++gld${EMULATION_NAME}_list_options (FILE * file)
++{
++  fprintf (file, _("\
++  --code-region={either,lower,upper,none}\n\
++  \tTransform .text* sections to {either,lower,upper,none}.text* sections.\n\
++  --data-region={either,lower,upper,none}\n\
++  \tTransform .data*, .rodata* and .bss* sections to\n\
++  {either,lower,upper,none}.{bss,data,rodata}* sections\n\
++  --disable-sec-transformation\n\
++  \tDisable transformation of .{text,data,bss,rodata}* sections to\n\
++  \tadd the {either,lower,upper,none} prefixes\n"));
++}
++
++static bfd_boolean
++gld${EMULATION_NAME}_handle_option (int optc)
++{
++  switch (optc)
++    {
++    case OPTION_CODE_REGION:
++      if (strcmp (optarg, "upper") == 0)
++	code_region = REGION_UPPER;
++      else if (strcmp (optarg, "lower") == 0)
++	code_region = REGION_LOWER;
++      else if (strcmp (optarg, "either") == 0)
++	code_region = REGION_EITHER;
++      else if (strcmp (optarg, "none") == 0)
++	code_region = REGION_NONE;
++      else if (strlen (optarg) == 0)
++	{
++	  einfo (_("%P: --code-region requires an argument: \
++		   {upper,lower,either,none}\n"));
++	  return FALSE;
++	}
++      else
++	{
++	  einfo (_("%P: error: unrecognized argument to --code-region= option: \
++		   \"%s\"\n"), optarg);
++	  return FALSE;
++	}
++      break;
++
++    case OPTION_DATA_REGION:
++      if (strcmp (optarg, "upper") == 0)
++	data_region = REGION_UPPER;
++      else if (strcmp (optarg, "lower") == 0)
++	data_region = REGION_LOWER;
++      else if (strcmp (optarg, "either") == 0)
++	data_region = REGION_EITHER;
++      else if (strcmp (optarg, "none") == 0)
++	data_region = REGION_NONE;
++      else if (strlen (optarg) == 0)
++	{
++	  einfo (_("%P: --data-region requires an argument: \
++		   {upper,lower,either,none}\n"));
++	  return FALSE;
++	}
++      else
++	{
++	  einfo (_("%P: error: unrecognized argument to --data-region= option: \
++		   \"%s\"\n"), optarg);
++	  return FALSE;
++	}
++      break;
++
++    case OPTION_DISABLE_TRANS:
++      disable_sec_transformation = TRUE;
++      break;
++
++    default:
++      return FALSE;
++    }
++  return TRUE;
++}
++
++static void
++eval_upper_either_sections (bfd *abfd, asection *s, void *data)
++{
++  const char * base_sec_name;
++  const char * curr_name;
++  char * either_name;
++  int curr_region;
++
++  lang_output_section_statement_type * lower;
++  lang_output_section_statement_type * upper;
++  static bfd_size_type *lower_size = 0;
++  static bfd_size_type *upper_size = 0;
++  static bfd_size_type lower_size_rom = 0;
++  static bfd_size_type lower_size_ram = 0;
++  static bfd_size_type upper_size_rom = 0;
++  static bfd_size_type upper_size_ram = 0;
++
++  if ((s->flags & SEC_ALLOC) == 0)
++    return;
++  if (bfd_link_relocatable (&link_info))
++    return;
++
++  base_sec_name = (const char *) data;
++  curr_name = bfd_get_section_name (abfd, s);
++
++  /* Only concerned with .either input sections in the upper output section.  */
++  either_name = concat (".either", base_sec_name, NULL);
++  if (strncmp (curr_name, either_name, strlen (either_name)) != 0
++      || strncmp (s->output_section->name, ".upper", 6) != 0)
++    goto end;
++
++  lower = lang_output_section_find (concat (".lower", base_sec_name, NULL));
++  upper = lang_output_section_find (concat (".upper", base_sec_name, NULL));
++
++  if (upper == NULL || upper->region == NULL)
++    goto end;
++  else if (lower == NULL)
++    lower = lang_output_section_find (base_sec_name);
++  if (lower == NULL || lower->region == NULL)
++    goto end;
++
++  if (strcmp (base_sec_name, ".text") == 0
++      || strcmp (base_sec_name, ".rodata") == 0)
++    curr_region = ROM;
++  else
++    curr_region = RAM;
++
++  if (curr_region == ROM)
++    {
++      if (lower_size_rom == 0)
++	{
++	  lower_size_rom = lower->region->current - lower->region->origin;
++	  upper_size_rom = upper->region->current - upper->region->origin;
++	}
++      lower_size = &lower_size_rom;
++      upper_size = &upper_size_rom;
++    }
++  else if (curr_region == RAM)
++    {
++      if (lower_size_ram == 0)
++	{
++	  lower_size_ram = lower->region->current - lower->region->origin;
++	  upper_size_ram = upper->region->current - upper->region->origin;
++	}
++      lower_size = &lower_size_ram;
++      upper_size = &upper_size_ram;
++    }
++
++  /* Move sections in the upper region that would fit in the lower
++     region to the lower region.  */
++  if (*upper_size > upper->region->length
++      && *lower_size + s->size < lower->region->length)
++    {
++      if (change_output_section (&(upper->children.head), s, lower))
++	{
++	  *upper_size -= s->size;
++	  *lower_size += s->size;
++	}
++    }
++ end:
++  free (either_name);
++}
++
++static void
++eval_lower_either_sections (bfd *abfd, asection *s, void *data)
++{
++  const char * base_sec_name;
++  const char * curr_name;
++  char * either_name;
++  int curr_region;
++  lang_output_section_statement_type * output_sec;
++  lang_output_section_statement_type * lower;
++  lang_output_section_statement_type * upper;
++
++  static bfd_size_type *lower_size = 0;
++  static bfd_size_type lower_size_rom = 0;
++  static bfd_size_type lower_size_ram = 0;
++
++  if ((s->flags & SEC_ALLOC) == 0)
++    return;
++  if (bfd_link_relocatable (&link_info))
++    return;
++
++  base_sec_name = (const char *) data;
++  curr_name = bfd_get_section_name (abfd, s);
++
++  /* Only concerned with .either input sections in the lower or "default"
++     output section i.e. not in the upper output section.  */
++  either_name = concat (".either", base_sec_name, NULL);
++  if (strncmp (curr_name, either_name, strlen (either_name)) != 0
++      || strncmp (s->output_section->name, ".upper", 6) == 0)
++    return;
++
++  if (strcmp (base_sec_name, ".text") == 0
++      || strcmp (base_sec_name, ".rodata") == 0)
++    curr_region = ROM;
++  else
++    curr_region = RAM;
++
++  output_sec = lang_output_section_find (s->output_section->name);
++
++  /* If the output_section doesn't exist, this has already been reported in
++     place_orphan, so don't need to warn again.  */
++  if (output_sec == NULL || output_sec->region == NULL)
++    goto end;
++
++  /* lower and output_sec might be the same, but in some cases an .either
++     section can end up in base_sec_name if it hasn't been placed by
++     place_orphan.  */
++  lower = lang_output_section_find (concat (".lower", base_sec_name, NULL));
++  upper = lang_output_section_find (concat (".upper", base_sec_name, NULL));
++  if (upper == NULL)
++    goto end;
++
++  if (curr_region == ROM)
++    {
++      if (lower_size_rom == 0)
++	{
++	  /* Get the size of other items in the lower region that aren't the
++	     sections to be moved around.  */
++	  lower_size_rom
++	    = (output_sec->region->current - output_sec->region->origin)
++	    - scan_children (output_sec->children.head);
++	  if (output_sec != lower && lower != NULL)
++	    lower_size_rom -= scan_children (lower->children.head);
++	}
++      lower_size = &lower_size_rom;
++    }
++  else if (curr_region == RAM)
++    {
++      if (lower_size_ram == 0)
++	{
++	  lower_size_ram
++	    = (output_sec->region->current - output_sec->region->origin)
++	    - scan_children (output_sec->children.head);
++	  if (output_sec != lower && lower != NULL)
++	    lower_size_ram -= scan_children (lower->children.head);
++	}
++      lower_size = &lower_size_ram;
++    }
++  /* Move sections that cause the lower region to overflow to the upper region.  */
++  if (*lower_size + s->size > output_sec->region->length)
++    change_output_section (&(output_sec->children.head), s, upper);
++  else
++    *lower_size += s->size;
++ end:
++  free (either_name);
++}
++
++/* This function is similar to lang_relax_sections, but without the size
++   evaluation code that is always executed after relaxation.  */
++static void
++intermediate_relax_sections (void)
++{
++  int i = link_info.relax_pass;
++
++  /* The backend can use it to determine the current pass.  */
++  link_info.relax_pass = 0;
++
++  while (i--)
++    {
++      bfd_boolean relax_again;
++
++      link_info.relax_trip = -1;
++      do
++	{
++	  link_info.relax_trip++;
++
++	  lang_do_assignments (lang_assigning_phase_enum);
++
++	  lang_reset_memory_regions ();
++
++	  relax_again = FALSE;
++	  lang_size_sections (&relax_again, FALSE);
++	}
++      while (relax_again);
++
++      link_info.relax_pass++;
++    }
++}
++
++static void
++msp430_elf_after_allocation (void)
++{
++  int relax_count = 0;
++  unsigned int i;
++  /* Go over each section twice, once to place either sections that don't fit
++     in lower into upper, and then again to move any sections in upper that
++     fit in lower into lower.  */
++  for (i = 0; i < 8; i++)
++    {
++      int placement_stage = (i < 4) ? LOWER_TO_UPPER : UPPER_TO_LOWER;
++      const char * base_sec_name;
++      lang_output_section_statement_type * upper;
++
++      switch (i % 4)
++	{
++	default:
++	case 0:
++	  base_sec_name = ".text";
++	  break;
++	case 1:
++	  base_sec_name = ".data";
++	  break;
++	case 2:
++	  base_sec_name = ".bss";
++	  break;
++	case 3:
++	  base_sec_name = ".rodata";
++	  break;
++	}
++      upper = lang_output_section_find (concat (".upper", base_sec_name, NULL));
++      if (upper != NULL)
++	{
++	  /* Can't just use one iteration over the all the sections to make
++	     both lower->upper and upper->lower transformations because the
++	     iterator encounters upper sections before all lower sections have
++	     been examined.  */
++	  bfd *abfd;
++
++	  if (placement_stage == LOWER_TO_UPPER)
++	    {
++	      /* Perform relaxation and get the final size of sections
++		 before trying to fit .either sections in the correct
++		 ouput sections.  */
++	      if (relax_count == 0)
++		{
++		  intermediate_relax_sections ();
++		  relax_count++;
++		}
++	      for (abfd = link_info.input_bfds; abfd != NULL;
++		   abfd = abfd->link.next)
++		{
++		  bfd_map_over_sections (abfd, eval_lower_either_sections,
++					 (void *) base_sec_name);
++		}
++	    }
++	  else if (placement_stage == UPPER_TO_LOWER)
++	    {
++	      /* Relax again before moving upper->lower.  */
++	      if (relax_count == 1)
++		{
++		  intermediate_relax_sections ();
++		  relax_count++;
++		}
++	      for (abfd = link_info.input_bfds; abfd != NULL;
++		   abfd = abfd->link.next)
++		{
++		  bfd_map_over_sections (abfd, eval_upper_either_sections,
++					 (void *) base_sec_name);
++		}
++	    }
++
++	}
++    }
++  gld${EMULATION_NAME}_after_allocation ();
++}
+ 
+ struct ld_emulation_xfer_struct ld_${EMULATION_NAME}_emulation =
+ {
+@@ -268,8 +847,8 @@
+   ${LDEMUL_SYSLIB-syslib_default},
+   ${LDEMUL_HLL-hll_default},
+   ${LDEMUL_AFTER_PARSE-after_parse_default},
+-  ${LDEMUL_AFTER_OPEN-after_open_default},
+-  ${LDEMUL_AFTER_ALLOCATION-after_allocation_default},
++  msp430_elf_after_open,
++  msp430_elf_after_allocation,
+   ${LDEMUL_SET_OUTPUT_ARCH-set_output_arch_default},
+   ${LDEMUL_CHOOSE_TARGET-ldemul_default_target},
+   ${LDEMUL_BEFORE_ALLOCATION-before_allocation_default},
+@@ -282,10 +861,10 @@
+   ${LDEMUL_PLACE_ORPHAN-gld${EMULATION_NAME}_place_orphan},
+   ${LDEMUL_SET_SYMBOLS-NULL},
+   ${LDEMUL_PARSE_ARGS-NULL},
+-  ${LDEMUL_ADD_OPTIONS-NULL},
+-  ${LDEMUL_HANDLE_OPTION-NULL},
++  gld${EMULATION_NAME}_add_options,
++  gld${EMULATION_NAME}_handle_option,
+   ${LDEMUL_UNRECOGNIZED_FILE-NULL},
+-  ${LDEMUL_LIST_OPTIONS-NULL},
++  gld${EMULATION_NAME}_list_options,
+   ${LDEMUL_RECOGNIZED_FILE-NULL},
+   ${LDEMUL_FIND_POTENTIAL_LIBRARIES-NULL},
+   ${LDEMUL_NEW_VERS_PATTERN-NULL},
+diff -ruN binutils-2.26/ld/ld.texinfo binutils-2.26-msp430/ld/ld.texinfo
+--- binutils-2.26/ld/ld.texinfo	2015-11-13 00:27:42.000000000 -0800
++++ binutils-2.26-msp430/ld/ld.texinfo	2019-06-25 02:25:14.422837123 -0700
+@@ -6973,6 +6973,29 @@
+ The last two sections are used by gcc.
+ @end table
+ 
++@table @option
++@cindex MSP430 Options
++@kindex --code-region
++@item --code-region=[either,lower,upper,none]
++This will transform .text* sections to [either,lower,upper].text* sections. The
++argument passed to GCC for -mcode-region is propagated to the linker
++using this option.
++
++@kindex --data-region
++@item --data-region=[either,lower,upper,none]
++This will transform .data*, .bss* and .rodata* sections to
++[either,lower,upper].[data,bss,rodata]* sections. The argument passed to GCC
++for -mdata-region is propagated to the linker using this option.
++
++@kindex --disable-sec-transformation
++@item --disable-sec-transformation
++Prevent the transformation of sections as specified by the @code{--code-region}
++and @code{--data-region} options.
++This is useful if you are compiling and linking using a single call to the GCC
++wrapper, and want to compile the source files using -m[code,data]-region but
++not transform the sections for prebuilt libraries and objects.
++@end table
++
+ @ifclear GENERIC
+ @lowersections
+ @end ifclear
+diff -ruN binutils-2.26/ld/scripttempl/elf32msp430_3.sc binutils-2.26-msp430/ld/scripttempl/elf32msp430_3.sc
+--- binutils-2.26/ld/scripttempl/elf32msp430_3.sc	2015-11-13 00:27:42.000000000 -0800
++++ binutils-2.26-msp430/ld/scripttempl/elf32msp430_3.sc	2019-06-25 02:25:14.422837123 -0700
+@@ -147,14 +147,19 @@
+     ${RELOCATING+ _edata = . ; }
+   } ${RELOCATING+ > data ${RELOCATING+AT> text}}
+   
++  __romdatastart = LOADADDR(.data);
++  __romdatacopysize = SIZEOF(.data);
++  
+   .bss ${RELOCATING+ SIZEOF(.data) + ADDR(.data)} :
+   {
+     ${RELOCATING+. = ALIGN(2);}
+     ${RELOCATING+ PROVIDE (__bss_start = .) ; }
++    ${RELOCATING+ PROVIDE (__bssstart = .); }
+     *(.bss)
+     *(COMMON)
+     ${RELOCATING+ PROVIDE (__bss_end = .) ; }
+   } ${RELOCATING+ > data}
++  ${RELOCATING+ PROVIDE (__bsssize = SIZEOF(.bss)); }
+ 
+   .noinit ${RELOCATING+ SIZEOF(.bss) + ADDR(.bss)} :
+   {
+@@ -180,7 +185,7 @@
+     ${RELOCATING+ _vectors_end = . ; }
+   } ${RELOCATING+ > vectors}
+ 
+-  .MP430.attributes 0 :
++  .MSP430.attributes 0 :
+   {
+     KEEP (*(.MSP430.attributes))
+     KEEP (*(.gnu.attributes))
+diff -ruN binutils-2.26/ld/scripttempl/elf32msp430.sc binutils-2.26-msp430/ld/scripttempl/elf32msp430.sc
+--- binutils-2.26/ld/scripttempl/elf32msp430.sc	2015-11-13 00:27:42.000000000 -0800
++++ binutils-2.26-msp430/ld/scripttempl/elf32msp430.sc	2019-06-25 02:25:14.422837123 -0700
+@@ -210,7 +210,6 @@
+     KEEP (*(.fini_array))
+     KEEP (*(SORT(.fini_array.*)))
+     PROVIDE (__fini_array_end = .);
+-    LONG(0); /* Sentinel.  */
+ 
+     /* gcc uses crtbegin.o to find the start of the constructors, so
+        we make sure it is first.  Because this is a wildcard, it
+@@ -269,10 +268,14 @@
+     ${RELOCATING+ _edata = . ; }
+   } ${RELOCATING+ > data ${RELOCATING+AT> text}}
+ 
++  __romdatastart = LOADADDR(.data);
++  __romdatacopysize = SIZEOF(.data);
++  
+   .bss ${RELOCATING+ SIZEOF(.data) + ADDR(.data)} :
+   {
+     ${RELOCATING+. = ALIGN(2);}
+-    ${RELOCATING+ PROVIDE (__bss_start = .) ; }
++    ${RELOCATING+ PROVIDE (__bss_start = .); }
++    ${RELOCATING+ PROVIDE (__bssstart = .); }
+     *(.lower.bss.* .lower.bss)
+     ${RELOCATING+. = ALIGN(2);}
+     *(.bss)
+@@ -280,6 +283,7 @@
+     *(COMMON)
+     ${RELOCATING+ PROVIDE (__bss_end = .) ; }
+   } ${RELOCATING+ > data}
++  ${RELOCATING+ PROVIDE (__bsssize = SIZEOF(.bss)); }
+ 
+   .noinit ${RELOCATING+ SIZEOF(.bss) + ADDR(.bss)} :
+   {
+@@ -314,7 +318,7 @@
+ source $srcdir/scripttempl/DWARF.sc
+ 
+ cat <<EOF
+-  .MP430.attributes 0 :
++  .MSP430.attributes 0 :
+   {
+     KEEP (*(.MSP430.attributes))
+     KEEP (*(.gnu.attributes))
+diff -ruN binutils-2.26/ld/testsuite/ld-elf/pr18735.d binutils-2.26-msp430/ld/testsuite/ld-elf/pr18735.d
+--- binutils-2.26/ld/testsuite/ld-elf/pr18735.d	2016-01-25 00:51:06.000000000 -0800
++++ binutils-2.26-msp430/ld/testsuite/ld-elf/pr18735.d	2019-06-25 02:25:14.422837123 -0700
+@@ -6,6 +6,8 @@
+ [ 	]*[0-9]+: [0-9a-fA-F]* +1 +OBJECT +GLOBAL +DEFAULT +[0-9]+ +foo@FOO
+ #...
+ [ 	]*[0-9]+: [0-9a-fA-F]* +1 +OBJECT +GLOBAL +DEFAULT +[0-9]+ +bar@@FOO
++#...
+ [ 	]*[0-9]+: [0-9a-fA-F]* +1 +OBJECT +GLOBAL +DEFAULT +[0-9]+ +foo
++#...
+ [ 	]*[0-9]+: [0-9a-fA-F]* +1 +OBJECT +GLOBAL +DEFAULT +[0-9]+ +bar
+ #pass
+diff -ruN binutils-2.26/ld/testsuite/ld-elfcomm/elfcomm.exp binutils-2.26-msp430/ld/testsuite/ld-elfcomm/elfcomm.exp
+--- binutils-2.26/ld/testsuite/ld-elfcomm/elfcomm.exp	2015-11-13 00:27:42.000000000 -0800
++++ binutils-2.26-msp430/ld/testsuite/ld-elfcomm/elfcomm.exp	2019-06-25 02:25:14.422837123 -0700
+@@ -33,6 +33,12 @@
+     return
+ }
+ 
++# Skip on msp430 if mdata-region is set, as this prevents symbols being marked
++# common.
++if {([istarget "msp430*-*-elf*"]
++    && [regexp ".*-mdata-region=(either|upper|lower).*" [board_info [target_info name] multilib_flags]])} {
++    return
++}
+ proc test_sort_common {} {
+     global exec_output
+     global objdump
+diff -ruN binutils-2.26/ld/testsuite/ld-plugin/lto.exp binutils-2.26-msp430/ld/testsuite/ld-plugin/lto.exp
+--- binutils-2.26/ld/testsuite/ld-plugin/lto.exp	2015-11-13 00:27:42.000000000 -0800
++++ binutils-2.26-msp430/ld/testsuite/ld-plugin/lto.exp	2019-06-25 02:25:14.422837123 -0700
+@@ -417,8 +417,19 @@
+ }
+ 
+ # Run "ld -r" to generate inputs for complex LTO tests.
++# XFAIL if msp430 mdata-region=upper/lower/either option is used,
++# this causes common symbols to be placed in .bss, resulting in test failures.
++if {([istarget "msp430*-*-elf*"]
++  && [regexp ".*-mdata-region=(either|upper|lower).*" [board_info [target_info name] multilib_flags]])} {
++    setup_xfail "msp430*-*-*"
++}
+ run_dump_test "lto-3r"
+ remote_exec host "mv" "tmpdir/dump tmpdir/lto-3.o"
++
++if {([istarget "msp430*-*-elf*"]
++  && [regexp ".*-mdata-region=(either|upper|lower).*" [board_info [target_info name] multilib_flags]])} {
++    setup_xfail "msp430*-*-*"
++}
+ run_dump_test "lto-5r"
+ remote_exec host "mv" "tmpdir/dump tmpdir/lto-5.o"
+ 
+diff -ruN binutils-2.26/ld/testsuite/ld-plugin/plugin.exp binutils-2.26-msp430/ld/testsuite/ld-plugin/plugin.exp
+--- binutils-2.26/ld/testsuite/ld-plugin/plugin.exp	2016-01-25 00:51:06.000000000 -0800
++++ binutils-2.26-msp430/ld/testsuite/ld-plugin/plugin.exp	2019-06-25 02:25:14.422837123 -0700
+@@ -183,9 +183,6 @@
+     $testobjfiles $libs" "" "" "" {{ld plugin-28.d}} "main.x" ] \
+     [list "plugin warning" "-plugin $plugin2_path -plugin-opt warning \
+     $testobjfiles $libs" "" "" "" {{ld plugin-29.d}} "main.x" ] \
+-    [list "PR ld/17973" "-plugin $plugin2_path -shared $regassilent \
+-			-plugin-opt add:tmpdir/pr17973.o \
+-    tmpdir/dummy.o" "" "" "" {{readelf -sW pr17973.d}} "main.x" ] \
+ ]
+ 
+ set plugin_lib_tests [list \
+@@ -257,6 +254,12 @@
+ 				{readelf -s plugin-vis-1.d}} "main.x" ] \
+ ]
+ 
++set plugin_shared_tests [list \
++    [list "PR ld/17973" "-plugin $plugin2_path -shared $regassilent \
++			-plugin-opt add:tmpdir/pr17973.o \
++    tmpdir/dummy.o" "" "" "" {{readelf -sW pr17973.d}} "main.x" ] \
++]
++
+ if { !$can_compile || $failed_compile } {
+     foreach testitem $plugin_tests {
+ 	$failure_kind [lindex $testitem 0]
+@@ -286,6 +289,16 @@
+     run_ld_link_tests $plugin_lib_tests
+ }
+ 
++if { ![ld_simple_link $ld tmpdir/tmpmain.so "-shared tmpdir/main.o -Ltmpdir"]
++    && [string match "*shared not supported*" $link_output] } {
++    foreach testitem $plugin_shared_tests {
++	unsupported [lindex $testitem 0]
++    }
++} else {
++    run_ld_link_tests $plugin_shared_tests
++}
++
++
+ set plugin_src_tests [list \
+     [list "plugin 2 with source lib" \
+ 	               "-plugin $plugin2_path $regclm $regas $regcln \
+diff -ruN binutils-2.26/ld/testsuite/ld-scripts/crossref.exp binutils-2.26-msp430/ld/testsuite/ld-scripts/crossref.exp
+--- binutils-2.26/ld/testsuite/ld-scripts/crossref.exp	2015-11-13 00:27:42.000000000 -0800
++++ binutils-2.26-msp430/ld/testsuite/ld-scripts/crossref.exp	2019-06-25 02:25:14.422837123 -0700
+@@ -108,6 +108,10 @@
+     return
+ }
+ 
++if {([istarget "msp430*-*-elf*"]
++  && [regexp ".*-m(data|code)-region=(either|upper|lower).*" [board_info [target_info name] multilib_flags]])} {
++    setup_xfail "msp430*-*-*"
++}
+ set exec_output [run_host_cmd "$ld" "$flags -o tmpdir/cross2 -T $srcdir/$subdir/cross2.t tmpdir/cross3.o"]
+ set exec_output [prune_warnings $exec_output]
+ 
+@@ -140,6 +144,10 @@
+     return
+ }
+ 
++if {([istarget "msp430*-*-elf*"]
++  && [regexp ".*-m(data|code)-region=(either|upper|lower).*" [board_info [target_info name] multilib_flags]])} {
++    setup_xfail "msp430*-*-*"
++}
+ set exec_output [run_host_cmd "$ld" "$flags -o tmpdir/cross3 -T $srcdir/$subdir/cross3.t tmpdir/cross3-partial.o tmpdir/cross2.o"]
+ 
+ set exec_output [prune_warnings $exec_output]
+diff -ruN binutils-2.26/opcodes/ChangeLog binutils-2.26-msp430/opcodes/ChangeLog
+--- binutils-2.26/opcodes/ChangeLog	2016-01-25 00:54:10.000000000 -0800
++++ binutils-2.26-msp430/opcodes/ChangeLog	2019-06-25 02:25:14.422837123 -0700
+@@ -1,3 +1,27 @@
++2017-01-12  Yao Qi  <yao.qi@linaro.org>
++
++	* msp430-dis.c (msp430_singleoperand): Return -1 if
++	msp430dis_opcode_signed returns false.
++	(msp430_doubleoperand): Likewise.
++	(msp430_branchinstr): Return -1 if
++	msp430dis_opcode_unsigned returns false.
++	(msp430x_calla_instr): Likewise.
++	(print_insn_msp430): Likewise.
++
++2016-05-27  Nick Clifton  <nickc@redhat.com>
++
++	PR target/20150
++	* msp430-dis.c (msp430dis_read_two_bytes): New function.
++	(msp430dis_opcode_unsigned): New function.
++	(msp430dis_opcode_signed): New function.
++	(msp430_singleoperand): Use the new opcode reading functions.
++	Only disassenmble bytes if they were successfully read.
++	(msp430_doubleoperand): Likewise.
++	(msp430_branchinstr): Likewise.
++	(msp430x_callx_instr): Likewise.
++	(print_insn_msp430): Check that it is safe to read bytes before
++	attempting disassembly.  Use the new opcode reading functions.
++
+ 2016-01-25  Tristan Gingold  <gingold@adacore.com>
+ 
+ 	* configure: Regenerate.
+diff -ruN binutils-2.26/opcodes/msp430-dis.c binutils-2.26-msp430/opcodes/msp430-dis.c
+--- binutils-2.26/opcodes/msp430-dis.c	2015-11-13 00:27:42.000000000 -0800
++++ binutils-2.26-msp430/opcodes/msp430-dis.c	2019-06-25 02:25:14.426837095 -0700
+@@ -24,6 +24,7 @@
+ #include <stdio.h>
+ #include <ctype.h>
+ #include <sys/types.h>
++#include <errno.h>
+ 
+ #include "dis-asm.h"
+ #include "opintl.h"
+@@ -36,19 +37,80 @@
+ 
+ #define PS(x)   (0xffff & (x))
+ 
+-static unsigned short
+-msp430dis_opcode (bfd_vma addr, disassemble_info *info)
++static bfd_boolean
++msp430dis_read_two_bytes (bfd_vma            addr,
++			  disassemble_info * info,
++			  bfd_byte *         buffer,
++			  char *             comm)
+ {
+-  bfd_byte buffer[2];
+   int status;
+ 
+   status = info->read_memory_func (addr, buffer, 2, info);
+-  if (status != 0)
++  if (status == 0)
++    return TRUE;
++
++  /* PR 20150: A status of EIO means that there were no more bytes left
++     to read in the current section.  This can happen when disassembling
++     interrupt vectors for example.  Avoid cluttering the output with
++     unhelpful error messages in this case.  */
++  if (status == EIO)
++    {
++      if (comm)
++	sprintf (comm, _("Warning: disassembly unreliable - not enough bytes available"));
++    }
++  else
+     {
+       info->memory_error_func (status, addr, info);
+-      return -1;
++      if (comm)
++	sprintf (comm, _("Error: read from memory failed"));
++    }
++
++  return FALSE;
++}
++
++static bfd_boolean
++msp430dis_opcode_unsigned (bfd_vma            addr,
++			   disassemble_info * info,
++			   unsigned short *   return_val,
++			   char *             comm)
++{
++  bfd_byte buffer[2];
++
++  if (msp430dis_read_two_bytes (addr, info, buffer, comm))
++    {
++      * return_val = bfd_getl16 (buffer);
++      return TRUE;
++    }
++  else
++    {
++      * return_val = 0;
++      return FALSE;
++    }
++}
++
++static bfd_boolean
++msp430dis_opcode_signed (bfd_vma            addr,
++			 disassemble_info * info,
++			 signed int *       return_val,
++			 char *             comm)
++{
++  bfd_byte buffer[2];
++
++  if (msp430dis_read_two_bytes (addr, info, buffer, comm))
++    {
++      int status;
++
++      status = bfd_getl_signed_16 (buffer);
++      if (status & 0x8000)
++	status |= -1U << 16;
++      * return_val = status;
++      return TRUE;
++    }
++  else
++    {
++      * return_val = 0;
++      return FALSE;
+     }
+-  return bfd_getl16 (buffer);
+ }
+ 
+ static int
+@@ -193,47 +255,57 @@
+ 	  if (regd == 0)
+ 	    {
+ 	      /* PC relative.  */
+-	      dst = msp430dis_opcode (addr + 2, info);
+-	      cmd_len += 2;
+-	      *cycles = 4;
+-	      sprintf (op, "0x%04x", dst);
+-	      sprintf (comm, "PC rel. abs addr 0x%04x",
+-		       PS ((short) (addr + 2) + dst));
+-	      if (extended_dst)
++	      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm))
+ 		{
+-		  dst |= extended_dst << 16;
+-		  sprintf (op, "0x%05x", dst);
+-		  sprintf (comm, "PC rel. abs addr 0x%05lx",
+-			   (long)((addr + 2 + dst) & 0xfffff));
++		  cmd_len += 2;
++		  *cycles = 4;
++		  sprintf (op, "0x%04x", dst);
++		  sprintf (comm, "PC rel. abs addr 0x%04x",
++			   PS ((short) (addr + 2) + dst));
++		  if (extended_dst)
++		    {
++		      dst |= extended_dst << 16;
++		      sprintf (op, "0x%05x", dst);
++		      sprintf (comm, "PC rel. abs addr 0x%05lx",
++			       (long)((addr + 2 + dst) & 0xfffff));
++		    }
+ 		}
++	      else
++		return -1;
+ 	    }
+ 	  else if (regd == 2)
+ 	    {
+ 	      /* Absolute.  */
+-	      dst = msp430dis_opcode (addr + 2, info);
+-	      cmd_len += 2;
+-	      *cycles = 4;
+-	      sprintf (op, "&0x%04x", PS (dst));
+-	      if (extended_dst)
++	      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm))
+ 		{
+-		  dst |= extended_dst << 16;
+-		  sprintf (op, "&0x%05x", dst & 0xfffff);
++		  cmd_len += 2;
++		  *cycles = 4;
++		  sprintf (op, "&0x%04x", PS (dst));
++		  if (extended_dst)
++		    {
++		      dst |= extended_dst << 16;
++		      sprintf (op, "&0x%05x", dst & 0xfffff);
++		    }
+ 		}
++	      else
++		return -1;
+ 	    }
+ 	  else
+ 	    {
+-	      dst = msp430dis_opcode (addr + 2, info);
+-	      cmd_len += 2;
+-	      *cycles = 4;
+-	      if (extended_dst)
++	      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm))
+ 		{
+-		  dst |= extended_dst << 16;
+-		  if (dst & 0x80000)
+-		    dst |= -1U << 20;
++		  cmd_len += 2;
++		  *cycles = 4;
++		  if (extended_dst)
++		    {
++		      dst |= extended_dst << 16;
++		      if (dst & 0x80000)
++			dst |= -1U << 20;
++		    }
++		  sprintf (op, "%d(r%d)", dst, regd);
+ 		}
+-	      else if (dst & 0x8000)
+-		dst |= -1U << 16;
+-	      sprintf (op, "%d(r%d)", dst, regd);
++	      else
++		return -1;
+ 	    }
+ 	}
+       break;
+@@ -264,20 +336,24 @@
+ 	    {
+ 	      *cycles = 3;
+ 	      /* absolute. @pc+ */
+-	      dst = msp430dis_opcode (addr + 2, info);
+-	      cmd_len += 2;
+-	      sprintf (op, "#%d", dst);
+-	      if (dst > 9 || dst < 0)
+-		sprintf (comm, "#0x%04x", PS (dst));
+-	      if (extended_dst)
++	      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm))
+ 		{
+-		  dst |= extended_dst << 16;
+-		  if (dst & 0x80000)
+-		    dst |= -1U << 20;
++		  cmd_len += 2;
+ 		  sprintf (op, "#%d", dst);
+ 		  if (dst > 9 || dst < 0)
+-		    sprintf (comm, "#0x%05x", dst);
++		    sprintf (comm, "#0x%04x", PS (dst));
++		  if (extended_dst)
++		    {
++		      dst |= extended_dst << 16;
++		      if (dst & 0x80000)
++			dst |= -1U << 20;
++		      sprintf (op, "#%d", dst);
++		      if (dst > 9 || dst < 0)
++			sprintf (comm, "#0x%05x", dst);
++		    }
+ 		}
++	      else
++		return -1;
+ 	    }
+ 	  else
+ 	    * cycles = print_as3_reg_name (regd, op, comm, 1, 1, 3);
+@@ -288,30 +364,38 @@
+ 	  if (regd == 0)
+ 	    {
+ 	      /* PC relative.  */
+-	      dst = msp430dis_opcode (addr + 2, info);
+-	      cmd_len += 2;
+-	      sprintf (op, "0x%04x", PS (dst));
+-	      sprintf (comm, "PC rel. 0x%04x",
+-		       PS ((short) addr + 2 + dst));
+-	      if (extended_dst)
++	      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm))
+ 		{
+-		  dst |= extended_dst << 16;
+-		  sprintf (op, "0x%05x", dst & 0xffff);
+-		  sprintf (comm, "PC rel. 0x%05lx",
+-			   (long)((addr + 2 + dst) & 0xfffff));
++		  cmd_len += 2;
++		  sprintf (op, "0x%04x", PS (dst));
++		  sprintf (comm, "PC rel. 0x%04x",
++			   PS ((short) addr + 2 + dst));
++		  if (extended_dst)
++		    {
++		      dst |= extended_dst << 16;
++		      sprintf (op, "0x%05x", dst & 0xffff);
++		      sprintf (comm, "PC rel. 0x%05lx",
++			       (long)((addr + 2 + dst) & 0xfffff));
++		    }
+ 		}
++	      else
++		return -1;
+ 	    }
+ 	  else if (regd == 2)
+ 	    {
+ 	      /* Absolute.  */
+-	      dst = msp430dis_opcode (addr + 2, info);
+-	      cmd_len += 2;
+-	      sprintf (op, "&0x%04x", PS (dst));
+-	      if (extended_dst)
++	      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm))
+ 		{
+-		  dst |= extended_dst << 16;
+-		  sprintf (op, "&0x%05x", dst & 0xfffff);
++		  cmd_len += 2;
++		  sprintf (op, "&0x%04x", PS (dst));
++		  if (extended_dst)
++		    {
++		      dst |= extended_dst << 16;
++		      sprintf (op, "&0x%05x", dst & 0xfffff);
++		    }
+ 		}
++	      else
++		return -1;
+ 	    }
+ 	  else if (regd == 3)
+ 	    {
+@@ -322,19 +406,21 @@
+ 	  else
+ 	    {
+ 	      /* Indexed.  */
+-	      dst = msp430dis_opcode (addr + 2, info);
+-	      cmd_len += 2;
+-	      if (extended_dst)
++	      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm))
+ 		{
+-		  dst |= extended_dst << 16;
+-		  if (dst & 0x80000)
+-		    dst |= -1U << 20;
++		  cmd_len += 2;
++		  if (extended_dst)
++		    {
++		      dst |= extended_dst << 16;
++		      if (dst & 0x80000)
++			dst |= -1U << 20;
++		    }
++		  sprintf (op, "%d(r%d)", dst, regd);
++		  if (dst > 9 || dst < 0)
++		    sprintf (comm, "%05x", dst);
+ 		}
+-	      else if (dst & 0x8000)
+-		dst |= -1U << 16;
+-	      sprintf (op, "%d(r%d)", dst, regd);
+-	      if (dst > 9 || dst < 0)
+-		sprintf (comm, "%05x", dst);
++	      else
++		return -1;
+ 	    }
+ 	}
+       break;
+@@ -352,6 +438,7 @@
+       *cycles = 2;
+       return 2;
+       break;
++
+     default:
+       cmd_len = 0;
+     }
+@@ -409,7 +496,7 @@
+ 	  /* Register mode.  */
+ 	  if (regd == 3)
+ 	    {
+-	      strcpy (comm1, _("Illegal as emulation instr"));
++	      strcpy (comm1, _("Warning: illegal as emulation instr"));
+ 	      return -1;
+ 	    }
+ 
+@@ -421,56 +508,73 @@
+ 	  if (regd == 0)
+ 	    {
+ 	      /* PC relative, Symbolic.  */
+-	      dst = msp430dis_opcode (addr + 2, info);
+-	      cmd_len += 4;
+-	      *cycles = 6;
+-	      sprintf (op1, "0x%04x", PS (dst));
+-	      sprintf (comm1, "PC rel. 0x%04x",
+-		       PS ((short) addr + 2 + dst));
+-	      if (extension_word)
++	      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm1))
+ 		{
+-		  dst |= extended_dst << 16;
+-		  if (dst & 0x80000)
+-		    dst |= -1U << 20;
+-		  sprintf (op1, "0x%05x", dst & 0xfffff);
+-		  sprintf (comm1, "PC rel. 0x%05lx",
+-			   (long)((addr + 2 + dst) & 0xfffff));
++		  cmd_len += 4;
++		  *cycles = 6;
++		  sprintf (op1, "0x%04x", PS (dst));
++		  sprintf (comm1, "PC rel. 0x%04x",
++			   PS ((short) addr + 2 + dst));
++		  if (extension_word)
++		    {
++		      dst |= extended_dst << 16;
++		      if (dst & 0x80000)
++			dst |= -1U << 20;
++		      sprintf (op1, "0x%05x", dst & 0xfffff);
++		      sprintf (comm1, "PC rel. 0x%05lx",
++			       (long)((addr + 2 + dst) & 0xfffff));
++		    }
+ 		}
++	      else
++		return -1;
+ 	    }
+ 	  else if (regd == 2)
+ 	    {
+ 	      /* Absolute.  */
+-	      dst = msp430dis_opcode (addr + 2, info);
+-	      /* If the 'src' field is not the same as the dst
+-		 then this is not an rla instruction.  */
+-	      if (dst != msp430dis_opcode (addr + 4, info))
+-		return 0;
+-	      cmd_len += 4;
+-	      *cycles = 6;
+-	      sprintf (op1, "&0x%04x", PS (dst));
+-	      if (extension_word)
++	      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm1))
+ 		{
+-		  dst |= extended_dst << 16;
+-		  sprintf (op1, "&0x%05x", dst & 0xfffff);
++		  int src;
++
++		  /* If the 'src' field is not the same as the dst
++		     then this is not an rla instruction.  */
++		  if (msp430dis_opcode_signed (addr + 4, info, &src, comm2))
++		    {
++		      if (src != dst)
++			return 0;
++		    }
++		  else
++		    return -1;
++		  cmd_len += 4;
++		  *cycles = 6;
++		  sprintf (op1, "&0x%04x", PS (dst));
++		  if (extension_word)
++		    {
++		      dst |= extended_dst << 16;
++		      sprintf (op1, "&0x%05x", dst & 0xfffff);
++		    }
+ 		}
++	      else
++		return -1;
+ 	    }
+ 	  else
+ 	    {
+ 	      /* Indexed.  */
+-	      dst = msp430dis_opcode (addr + 2, info);
+-	      if (extension_word)
++	      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm1))
+ 		{
+-		  dst |= extended_dst << 16;
+-		  if (dst & 0x80000)
+-		    dst |= -1U << 20;
++		  if (extension_word)
++		    {
++		      dst |= extended_dst << 16;
++		      if (dst & 0x80000)
++			dst |= -1U << 20;
++		    }
++		  cmd_len += 4;
++		  *cycles = 6;
++		  sprintf (op1, "%d(r%d)", dst, regd);
++		  if (dst > 9 || dst < -9)
++		    sprintf (comm1, "#0x%05x", dst);
+ 		}
+-	      else if (dst & 0x8000)
+-		dst |= -1U << 16;
+-	      cmd_len += 4;
+-	      *cycles = 6;
+-	      sprintf (op1, "%d(r%d)", dst, regd);
+-	      if (dst > 9 || dst < -9)
+-		sprintf (comm1, "#0x%05x", dst);
++	      else
++		return -1;
+ 	    }
+ 	}
+ 
+@@ -484,7 +588,7 @@
+   if (ad == 0 && regd == 3)
+     {
+       /* R2/R3 are illegal as dest: may be data section.  */
+-      strcpy (comm1, _("Illegal as 2-op instr"));
++      strcpy (comm1, _("Warning: illegal as 2-op instr"));
+       return -1;
+     }
+ 
+@@ -514,20 +618,25 @@
+ 	{
+ 	  *cycles = 3;
+ 	  /* Absolute. @pc+.  */
+-	  dst = msp430dis_opcode (addr + 2, info);
+-	  cmd_len += 2;
+-	  sprintf (op1, "#%d", dst);
+-	  if (dst > 9 || dst < 0)
+-	    sprintf (comm1, "#0x%04x", PS (dst));
+-	  if (extension_word)
+-	    {
+-	      dst |= extended_src << 16;
+-	      if (dst & 0x80000)
+-		dst |= -1U << 20;
++	  if (msp430dis_opcode_signed (addr + 2, info, &dst, comm1))
++	    {
++	      cmd_len += 2;
+ 	      sprintf (op1, "#%d", dst);
+ 	      if (dst > 9 || dst < 0)
+-		sprintf (comm1, "0x%05x", dst & 0xfffff);
++		sprintf (comm1, "#0x%04x", PS (dst));
++	      if (extension_word)
++		{
++		  dst &= 0xffff;
++		  dst |= extended_src << 16;
++		  if (dst & 0x80000)
++		    dst |= -1U << 20;
++		  sprintf (op1, "#%d", dst);
++		  if (dst > 9 || dst < 0)
++		    sprintf (comm1, "0x%05x", dst & 0xfffff);
++		}
+ 	    }
++	  else
++	    return -1;
+ 	}
+       else
+ 	* cycles = print_as3_reg_name (regs, op1, comm1, 1, 1, 2);
+@@ -538,35 +647,45 @@
+ 	{
+ 	  *cycles = 4;
+ 	  /* PC relative.  */
+-	  dst = msp430dis_opcode (addr + 2, info);
+-	  cmd_len += 2;
+-	  sprintf (op1, "0x%04x", PS (dst));
+-	  sprintf (comm1, "PC rel. 0x%04x",
+-		   PS ((short) addr + 2 + dst));
+-	  if (extension_word)
+-	    {
+-	      dst |= extended_src << 16;
+-	      if (dst & 0x80000)
+-		dst |= -1U << 20;
+-	      sprintf (op1, "0x%05x", dst & 0xfffff);
+-	      sprintf (comm1, "PC rel. 0x%05lx",
+-		       (long) ((addr + 2 + dst) & 0xfffff));
++	  if (msp430dis_opcode_signed (addr + 2, info, &dst, comm1))
++	    {
++	      cmd_len += 2;
++	      sprintf (op1, "0x%04x", PS (dst));
++	      sprintf (comm1, "PC rel. 0x%04x",
++		       PS ((short) addr + 2 + dst));
++	      if (extension_word)
++		{
++		  dst &= 0xffff;
++		  dst |= extended_src << 16;
++		  if (dst & 0x80000)
++		    dst |= -1U << 20;
++		  sprintf (op1, "0x%05x", dst & 0xfffff);
++		  sprintf (comm1, "PC rel. 0x%05lx",
++			   (long) ((addr + 2 + dst) & 0xfffff));
++		}
+ 	    }
++	  else
++	    return -1;
+ 	}
+       else if (regs == 2)
+ 	{
+ 	  *cycles = 2;
+ 	  /* Absolute.  */
+-	  dst = msp430dis_opcode (addr + 2, info);
+-	  cmd_len += 2;
+-	  sprintf (op1, "&0x%04x", PS (dst));
+-	  sprintf (comm1, "0x%04x", PS (dst));
+-	  if (extension_word)
+-	    {
+-	      dst |= extended_src << 16;
+-	      sprintf (op1, "&0x%05x", dst & 0xfffff);
+-	      * comm1 = 0;
++	  if (msp430dis_opcode_signed (addr + 2, info, &dst, comm1))
++	    {
++	      cmd_len += 2;
++	      sprintf (op1, "&0x%04x", PS (dst));
++	      sprintf (comm1, "0x%04x", PS (dst));
++	      if (extension_word)
++		{
++		  dst &= 0xffff;
++		  dst |= extended_src << 16;
++		  sprintf (op1, "&0x%05x", dst & 0xfffff);
++		  * comm1 = 0;
++		}
+ 	    }
++	  else
++	    return -1;
+ 	}
+       else if (regs == 3)
+ 	{
+@@ -578,19 +697,22 @@
+ 	{
+ 	  *cycles = 3;
+ 	  /* Indexed.  */
+-	  dst = msp430dis_opcode (addr + 2, info);
+-	  cmd_len += 2;
+-	  if (extension_word)
++	  if (msp430dis_opcode_signed (addr + 2, info, &dst, comm1))
+ 	    {
+-	      dst |= extended_src << 16;
+-	      if (dst & 0x80000)
+-		dst |= -1U << 20;
+-	    }
+-	  else if (dst & 0x8000)
+-	    dst |= -1U << 16;
+-	  sprintf (op1, "%d(r%d)", dst, regs);
+-	  if (dst > 9 || dst < -9)
+-	    sprintf (comm1, "0x%05x", dst);
++	      cmd_len += 2;
++	      if (extension_word)
++		{
++		  dst &= 0xffff;
++		  dst |= extended_src << 16;
++		  if (dst & 0x80000)
++		    dst |= -1U << 20;
++		}
++	      sprintf (op1, "%d(r%d)", dst, regs);
++	      if (dst > 9 || dst < -9)
++		sprintf (comm1, "0x%05x", dst);
++	    }
++	  else
++	    return -1;
+ 	}
+     }
+ 
+@@ -621,50 +743,60 @@
+ 	{
+ 	  /* PC relative.  */
+ 	  *cycles += 1;
+-	  dst = msp430dis_opcode (addr + cmd_len, info);
+-	  sprintf (op2, "0x%04x", PS (dst));
+-	  sprintf (comm2, "PC rel. 0x%04x",
+-		   PS ((short) addr + cmd_len + dst));
+-	  if (extension_word)
+-	    {
+-	      dst |= extended_dst << 16;
+-	      if (dst & 0x80000)
+-		dst |= -1U << 20;
+-	      sprintf (op2, "0x%05x", dst & 0xfffff);
+-	      sprintf (comm2, "PC rel. 0x%05lx",
+-		       (long)((addr + cmd_len + dst) & 0xfffff));
++	  if (msp430dis_opcode_signed (addr + cmd_len, info, &dst, comm2))
++	    {
++	      sprintf (op2, "0x%04x", PS (dst));
++	      sprintf (comm2, "PC rel. 0x%04x",
++		       PS ((short) addr + cmd_len + dst));
++	      if (extension_word)
++		{
++		  dst |= extended_dst << 16;
++		  if (dst & 0x80000)
++		    dst |= -1U << 20;
++		  sprintf (op2, "0x%05x", dst & 0xfffff);
++		  sprintf (comm2, "PC rel. 0x%05lx",
++			   (long)((addr + cmd_len + dst) & 0xfffff));
++		}
+ 	    }
++	  else
++	    return -1;
+ 	  cmd_len += 2;
+ 	}
+       else if (regd == 2)
+ 	{
+ 	  /* Absolute.  */
+-	  dst = msp430dis_opcode (addr + cmd_len, info);
+-	  cmd_len += 2;
+-	  sprintf (op2, "&0x%04x", PS (dst));
+-	  if (extension_word)
++	  if (msp430dis_opcode_signed (addr + cmd_len, info, &dst, comm2))
+ 	    {
+-	      dst |= extended_dst << 16;
+-	      sprintf (op2, "&0x%05x", dst & 0xfffff);
++	      cmd_len += 2;
++	      sprintf (op2, "&0x%04x", PS (dst));
++	      if (extension_word)
++		{
++		  dst |= extended_dst << 16;
++		  sprintf (op2, "&0x%05x", dst & 0xfffff);
++		}
+ 	    }
++	  else
++	    return -1;
+ 	}
+       else
+ 	{
+-	  dst = msp430dis_opcode (addr + cmd_len, info);
+-	  cmd_len += 2;
+-	  if (dst & 0x8000)
+-	    dst |= -1U << 16;
+-	  if (dst > 9 || dst < 0)
+-	    sprintf (comm2, "0x%04x", PS (dst));
+-	  if (extension_word)
+-	    {
+-	      dst |= extended_dst << 16;
+-	      if (dst & 0x80000)
+-		dst |= -1U << 20;
++	  if (msp430dis_opcode_signed (addr + cmd_len, info, &dst, comm2))
++	    {
++	      cmd_len += 2;
+ 	      if (dst > 9 || dst < 0)
+-		sprintf (comm2, "0x%05x", dst & 0xfffff);
++		sprintf (comm2, "0x%04x", PS (dst));
++	      if (extension_word)
++		{
++		  dst |= extended_dst << 16;
++		  if (dst & 0x80000)
++		    dst |= -1U << 20;
++		  if (dst > 9 || dst < 0)
++		    sprintf (comm2, "0x%05x", dst & 0xfffff);
++		}
++	      sprintf (op2, "%d(r%d)", dst, regd);
+ 	    }
+-	  sprintf (op2, "%d(r%d)", dst, regd);
++	  else
++	    return -1;
+ 	}
+     }
+ 
+@@ -683,7 +815,8 @@
+   int regs = 0, regd = 0;
+   int as = 0;
+   int cmd_len = 2;
+-  short dst = 0;
++  int dst = 0;
++  unsigned short udst = 0;
+ 
+   regd = insn & 0x0f;
+   regs = (insn & 0x0f00) >> 8;
+@@ -719,9 +852,13 @@
+ 	{
+ 	  /* Absolute. @pc+  */
+ 	  *cycles = 3;
+-	  dst = msp430dis_opcode (addr + 2, info);
+-	  cmd_len += 2;
+-	  sprintf (op1, "#0x%04x", PS (dst));
++	  if (msp430dis_opcode_unsigned (addr + 2, info, &udst, comm1))
++	    {
++	      cmd_len += 2;
++	      sprintf (op1, "#0x%04x", PS (udst));
++	    }
++	  else
++	    return -1;
+ 	}
+       else
+ 	* cycles = print_as3_reg_name (regs, op1, comm1, 1, 1, 2);
+@@ -733,19 +870,27 @@
+       if (regs == 0)
+ 	{
+ 	  /* PC relative.  */
+-	  dst = msp430dis_opcode (addr + 2, info);
+-	  cmd_len += 2;
+-	  (*cycles)++;
+-	  sprintf (op1, "0x%04x", PS (dst));
+-	  sprintf (comm1, "PC rel. 0x%04x",
+-		   PS ((short) addr + 2 + dst));
++	  if (msp430dis_opcode_signed (addr + 2, info, &dst, comm1))
++	    {
++	      cmd_len += 2;
++	      (*cycles)++;
++	      sprintf (op1, "0x%04x", PS (dst));
++	      sprintf (comm1, "PC rel. 0x%04x",
++		       PS ((short) addr + 2 + dst));
++	    }
++	  else
++	    return -1;
+ 	}
+       else if (regs == 2)
+ 	{
+ 	  /* Absolute.  */
+-	  dst = msp430dis_opcode (addr + 2, info);
+-	  cmd_len += 2;
+-	  sprintf (op1, "&0x%04x", PS (dst));
++	  if (msp430dis_opcode_unsigned (addr + 2, info, &udst, comm1))
++	    {
++	      cmd_len += 2;
++	      sprintf (op1, "&0x%04x", PS (udst));
++	    }
++	  else
++	    return -1;
+ 	}
+       else if (regs == 3)
+ 	{
+@@ -756,11 +901,13 @@
+       else
+ 	{
+ 	  /* Indexed.  */
+-	  dst = msp430dis_opcode (addr + 2, info);
+-	  cmd_len += 2;
+-	  if (dst & 0x8000)
+-	    dst |= -1U << 16;
+-	  sprintf (op1, "%d(r%d)", dst, regs);
++	  if (msp430dis_opcode_signed (addr + 2, info, &dst, comm1))
++	    {
++	      cmd_len += 2;
++	      sprintf (op1, "%d(r%d)", dst, regs);
++	    }
++	  else
++	    return -1;
+ 	}
+     }
+ 
+@@ -780,7 +927,7 @@
+   int            am = (insn & 0xf0) >> 4;
+   int            cmd_len = 2;
+   unsigned short udst = 0;
+-  short          dst = 0;
++  int            dst = 0;
+ 
+   switch (am)
+     {
+@@ -791,13 +938,17 @@
+ 
+     case 5: /* CALLA x(Rdst) */
+       *cycles = 3;
+-      dst = msp430dis_opcode (addr + 2, info);
+-      cmd_len += 2;
+-      sprintf (op1, "%d(r%d)", dst, reg);
+-      if (reg == 0)
+-	sprintf (comm1, "PC rel. 0x%05lx", (long) (addr + 2 + dst));
++      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm1))
++	{
++	  cmd_len += 2;
++	  sprintf (op1, "%d(r%d)", dst, reg);
++	  if (reg == 0)
++	    sprintf (comm1, "PC rel. 0x%05lx", (long) (addr + 2 + dst));
++	  else
++	    sprintf (comm1, "0x%05x", dst);
++	}
+       else
+-	sprintf (comm1, "0x%05x", dst);
++	return -1;
+       break;
+ 
+     case 6: /* CALLA @Rdst */
+@@ -811,32 +962,44 @@
+       break;
+ 
+     case 8: /* CALLA &abs20 */
+-      udst = msp430dis_opcode (addr + 2, info);
+-      cmd_len += 2;
+-      *cycles = 4;
+-      sprintf (op1, "&%d", (ureg << 16) + udst);
+-      sprintf (comm1, "0x%05x", (ureg << 16) + udst);
++      if (msp430dis_opcode_unsigned (addr + 2, info, &udst, comm1))
++	{
++	  cmd_len += 2;
++	  *cycles = 4;
++	  sprintf (op1, "&%d", (ureg << 16) + udst);
++	  sprintf (comm1, "0x%05x", (ureg << 16) + udst);
++	}
++      else
++	return -1;
+       break;
+ 
+     case 9: /* CALLA pcrel-sym */
+-      dst = msp430dis_opcode (addr + 2, info);
+-      cmd_len += 2;
+-      *cycles = 4;
+-      sprintf (op1, "%d(PC)", (reg << 16) + dst);
+-      sprintf (comm1, "PC rel. 0x%05lx",
+-	       (long) (addr + 2 + dst + (reg << 16)));
++      if (msp430dis_opcode_signed (addr + 2, info, &dst, comm1))
++	{
++	  cmd_len += 2;
++	  *cycles = 4;
++	  sprintf (op1, "%d(PC)", (reg << 16) + dst);
++	  sprintf (comm1, "PC rel. 0x%05lx",
++		   (long) (addr + 2 + dst + (reg << 16)));
++	}
++      else
++	return -1;
+       break;
+ 
+     case 11: /* CALLA #imm20 */
+-      udst = msp430dis_opcode (addr + 2, info);
+-      cmd_len += 2;
+-      *cycles = 4;
+-      sprintf (op1, "#%d", (ureg << 16) + udst);
+-      sprintf (comm1, "0x%05x", (ureg << 16) + udst);
++      if (msp430dis_opcode_unsigned (addr + 2, info, &udst, comm1))
++	{
++	  cmd_len += 2;
++	  *cycles = 4;
++	  sprintf (op1, "#%d", (ureg << 16) + udst);
++	  sprintf (comm1, "0x%05x", (ureg << 16) + udst);
++	}
++      else
++	return -1;
+       break;
+ 
+     default:
+-      strcpy (comm1, _("unrecognised CALLA addressing mode"));
++      strcpy (comm1, _("Warning: unrecognised CALLA addressing mode"));
+       return -1;
+     }
+ 
+@@ -855,13 +1018,10 @@
+   int cycles = 0;
+   char *bc = "";
+   unsigned short extension_word = 0;
++  unsigned short bits;
+ 
+-  insn = msp430dis_opcode (addr, info);
+-  if (insn == (unsigned short) -1)
+-    {
+-      prin (stream, ".word	0xffff;	????");
+-      return 2;
+-    }
++  if (! msp430dis_opcode_unsigned (addr, info, &insn, NULL))
++    return -1;
+ 
+   if (((int) addr & 0xffff) > 0xffdf)
+     {
+@@ -877,13 +1037,8 @@
+     {
+       extension_word = insn;
+       addr += 2;
+-      insn = msp430dis_opcode (addr, info);
+-      if (insn == (unsigned short) -1)
+-	{
+-	  prin (stream, ".word	0x%04x, 0xffff;	????",
+-		extension_word);
+-	  return 4;
+-	}
++      if (! msp430dis_opcode_unsigned (addr, info, &insn, NULL))
++	return -1;
+    }
+ 
+   for (opcode = msp430_opcodes; opcode->name; opcode++)
+@@ -901,9 +1056,13 @@
+ 	      && (insn & 0x000f) == 0
+ 	      && (insn & 0x0080) == 0)
+ 	    {
+-	      cmd_len +=
++	      int ret =
+ 		msp430_branchinstr (info, opcode, addr, insn, op1, comm1,
+ 				    &cycles);
++
++	      if (ret == -1)
++		return -1;
++	      cmd_len += ret;
+ 	      if (cmd_len)
+ 		break;
+ 	    }
+@@ -912,10 +1071,14 @@
+ 	    {
+ 	      int n;
+ 	      int reg;
++	      int ret;
+ 
+ 	    case 4:
+-	      cmd_len += msp430x_calla_instr (info, addr, insn,
+-					      op1, comm1, & cycles);
++	      ret = msp430x_calla_instr (info, addr, insn,
++					 op1, comm1, & cycles);
++	      if (ret == -1)
++		return -1;
++	      cmd_len += ret;
+ 	      break;
+ 
+ 	    case 5: /* PUSHM/POPM */
+@@ -963,10 +1126,15 @@
+ 	      else
+ 		{
+ 		  n <<= 16;
+-		  n |= msp430dis_opcode (addr + 2, info);
+-		  sprintf (op1, "#%d", n);
+-		  if (n > 9 || n < 0)
+-		    sprintf (comm1, "0x%05x", n);
++		  if (msp430dis_opcode_unsigned (addr + 2, info, &bits, comm1))
++		    {
++		      n |= bits;
++		      sprintf (op1, "#%d", n);
++		      if (n > 9 || n < 0)
++			sprintf (comm1, "0x%05x", n);
++		    }
++		  else
++		    return -1;
+ 		  cmd_len = 4;
+ 		}
+ 	      sprintf (op2, "r%d", reg);
+@@ -998,12 +1166,17 @@
+ 		case 2: /* MOVA &abs20, Rdst */
+ 		  cmd_len = 4;
+ 		  n <<= 16;
+-		  n |= msp430dis_opcode (addr + 2, info);
+-		  sprintf (op1, "&%d", n);
+-		  if (n > 9 || n < 0)
+-		    sprintf (comm1, "0x%05x", n);
+-		  if (strcmp (opcode->name, "bra") != 0)
+-		    sprintf (op2, "r%d", reg);
++		  if (msp430dis_opcode_unsigned (addr + 2, info, &bits, comm1))
++		    {
++		      n |= bits;
++		      sprintf (op1, "&%d", n);
++		      if (n > 9 || n < 0)
++			sprintf (comm1, "0x%05x", n);
++		      if (strcmp (opcode->name, "bra") != 0)
++			sprintf (op2, "r%d", reg);
++		    }
++		  else
++		    return -1;
+ 		  break;
+ 
+ 		case 3: /* MOVA x(Rsrc), Rdst */
+@@ -1011,58 +1184,72 @@
+ 		  if (strcmp (opcode->name, "bra") != 0)
+ 		    sprintf (op2, "r%d", reg);
+ 		  reg = n;
+-		  n = msp430dis_opcode (addr + 2, info);
+-		  if (n & 0x8000)
+-		    n |= -1U << 16;
+-		  sprintf (op1, "%d(r%d)", n, reg);
+-		  if (n > 9 || n < 0)
+-		    {
+-		      if (reg == 0)
+-			sprintf (comm1, "PC rel. 0x%05lx",
+-				 (long) (addr + 2 + n));
+-		      else
+-			sprintf (comm1, "0x%05x", n);
++		  if (msp430dis_opcode_signed (addr + 2, info, &n, comm1))
++		    {
++		      sprintf (op1, "%d(r%d)", n, reg);
++		      if (n > 9 || n < 0)
++			{
++			  if (reg == 0)
++			    sprintf (comm1, "PC rel. 0x%05lx",
++				     (long) (addr + 2 + n));
++			  else
++			    sprintf (comm1, "0x%05x", n);
++			}
+ 		    }
++		  else
++		    return -1;
+ 		  break;
+ 
+ 		case 6: /* MOVA Rsrc, &abs20 */
+ 		  cmd_len = 4;
+ 		  reg <<= 16;
+-		  reg |= msp430dis_opcode (addr + 2, info);
+-		  sprintf (op1, "r%d", n);
+-		  sprintf (op2, "&%d", reg);
+-		  if (reg > 9 || reg < 0)
+-		    sprintf (comm2, "0x%05x", reg);
++		  if (msp430dis_opcode_unsigned (addr + 2, info, &bits, comm2))
++		    {
++		      reg |= bits;
++		      sprintf (op1, "r%d", n);
++		      sprintf (op2, "&%d", reg);
++		      if (reg > 9 || reg < 0)
++			sprintf (comm2, "0x%05x", reg);
++		    }
++		  else
++		    return -1;
+ 		  break;
+ 
+ 		case 7: /* MOVA Rsrc, x(Rdst) */
+ 		  cmd_len = 4;
+ 		  sprintf (op1, "r%d", n);
+-		  n = msp430dis_opcode (addr + 2, info);
+-		  if (n & 0x8000)
+-		    n |= -1U << 16;
+-		  sprintf (op2, "%d(r%d)", n, reg);
+-		  if (n > 9 || n < 0)
+-		    {
+-		      if (reg == 0)
+-			sprintf (comm2, "PC rel. 0x%05lx",
+-				 (long) (addr + 2 + n));
+-		      else
+-			sprintf (comm2, "0x%05x", n);
++		  if (msp430dis_opcode_signed (addr + 2, info, &n, comm2))
++		    {
++		      sprintf (op2, "%d(r%d)", n, reg);
++		      if (n > 9 || n < 0)
++			{
++			  if (reg == 0)
++			    sprintf (comm2, "PC rel. 0x%05lx",
++				     (long) (addr + 2 + n));
++			  else
++			    sprintf (comm2, "0x%05x", n);
++			}
+ 		    }
++		  else
++		    return -1;
+ 		  break;
+ 
+ 		case 8: /* MOVA #imm20, Rdst */
+ 		  cmd_len = 4;
+ 		  n <<= 16;
+-		  n |= msp430dis_opcode (addr + 2, info);
+-		  if (n & 0x80000)
+-		    n |= -1U << 20;
+-		  sprintf (op1, "#%d", n);
+-		  if (n > 9 || n < 0)
+-		    sprintf (comm1, "0x%05x", n);
+-		  if (strcmp (opcode->name, "bra") != 0)
+-		    sprintf (op2, "r%d", reg);
++		  if (msp430dis_opcode_unsigned (addr + 2, info, &bits, comm1))
++		    {
++		      n |= bits;
++		      if (n & 0x80000)
++			n |= -1U << 20;
++		      sprintf (op1, "#%d", n);
++		      if (n > 9 || n < 0)
++			sprintf (comm1, "0x%05x", n);
++		      if (strcmp (opcode->name, "bra") != 0)
++			sprintf (op2, "r%d", reg);
++		    }
++		  else
++		    return -1;
+ 		  break;
+ 
+ 		case 12: /* MOVA Rsrc, Rdst */
+@@ -1084,15 +1271,21 @@
+ 
+ 	  switch (opcode->insn_opnumb)
+ 	    {
++	      int ret;
++
+ 	    case 0:
+ 	      cmd_len += msp430_nooperands (opcode, addr, insn, comm1, &cycles);
+ 	      break;
+ 	    case 2:
+-	      cmd_len +=
++	      ret =
+ 		msp430_doubleoperand (info, opcode, addr, insn, op1, op2,
+ 				      comm1, comm2,
+ 				      extension_word,
+ 				      &cycles);
++
++	      if (ret == -1)
++		return -1;
++	      cmd_len += ret;
+ 	      if (insn & BYTE_OPERATION)
+ 		{
+ 		  if (extension_word != 0 && ((extension_word & BYTE_OPERATION) == 0))
+@@ -1107,16 +1300,20 @@
+ 		  else
+ 		    {
+ 		      bc = ".?";
+-		      sprintf (comm2, _("Reserved use of A/L and B/W bits detected"));
++		      sprintf (comm2, _("Warning: reserved use of A/L and B/W bits detected"));
+ 		    }
+ 		}
+ 
+ 	      break;
+ 	    case 1:
+-	      cmd_len +=
++	      ret =
+ 		msp430_singleoperand (info, opcode, addr, insn, op1, comm1,
+ 				      extension_word,
+ 				      &cycles);
++
++	      if (ret == -1)
++		return -1;
++	      cmd_len += ret;
+ 	      if (extension_word
+ 		  && (strcmp (opcode->name, "swpb") == 0
+ 		      || strcmp (opcode->name, "sxt") == 0))
+@@ -1124,7 +1321,7 @@
+ 		  if (insn & BYTE_OPERATION)
+ 		    {
+ 		      bc = ".?";
+-		      sprintf (comm2, _("Reserved use of A/L and B/W bits detected"));
++		      sprintf (comm2, _("Warning: reserved use of A/L and B/W bits detected"));
+ 		    }
+ 		  else if (extension_word & BYTE_OPERATION)
+ 		    bc = ".w";
+@@ -1145,7 +1342,7 @@
+ 		  else
+ 		    {
+ 		      bc = ".?";
+-		      sprintf (comm2, _("Reserved use of A/L and B/W bits detected"));
++		      sprintf (comm2, _("Warning: reserved use of A/L and B/W bits detected"));
+ 		    }
+ 		}
+ 	      break;

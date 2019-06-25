@@ -1,0 +1,449 @@
+diff -ruN gdb-8.1/bfd/config.bfd gdb-8.1-msp430/bfd/config.bfd
+--- gdb-8.1/bfd/config.bfd	2018-01-04 20:07:23.000000000 -0800
++++ gdb-8.1-msp430/bfd/config.bfd	2019-06-25 02:31:56.063961795 -0700
+@@ -180,6 +180,8 @@
+ m88*)		 targ_archs=bfd_m88k_arch ;;
+ microblaze*)	 targ_archs=bfd_microblaze_arch ;;
+ mips*)		 targ_archs=bfd_mips_arch ;;
++#ADD ME GCC8?
++#msp430*)	 targ_archs=bfd_msp430_arch;;
+ nds32*)		 targ_archs=bfd_nds32_arch ;;
+ nios2*)          targ_archs=bfd_nios2_arch ;;
+ or1k*|or1knd*)	 targ_archs=bfd_or1k_arch ;;
+diff -ruN gdb-8.1/bfd/cpu-msp430.c gdb-8.1-msp430/bfd/cpu-msp430.c
+--- gdb-8.1/bfd/cpu-msp430.c	2018-01-04 20:07:23.000000000 -0800
++++ gdb-8.1-msp430/bfd/cpu-msp430.c	2019-06-25 02:31:56.063961795 -0700
+@@ -41,6 +41,18 @@
+   return a;
+ }
+ 
++/* The additional processing in bfd_default_scan causes problems when looking
++   for the "MSP430" machine, which matches the common architecture name
++   "msp430".  */
++static bfd_boolean
++bfd_msp430_scan (const bfd_arch_info_type *info, const char *string)
++{
++  /* Exact match of the machine name (PRINTABLE_NAME)?  */
++  if (strcasecmp (string, info->printable_name) == 0)
++    return TRUE;
++  return FALSE;
++}
++
+ #define N(addr_bits, machine, print, default, next)		\
+ {								\
+   16,				/* 16 bits in a word.  */	\
+@@ -53,7 +65,7 @@
+   1,				/* Section align power.  */	\
+   default,			/* The default machine.  */	\
+   compatible,							\
+-  bfd_default_scan,						\
++  bfd_msp430_scan,						\
+   bfd_arch_default_fill,					\
+   next								\
+ }
+@@ -134,5 +146,5 @@
+ };
+ 
+ const bfd_arch_info_type bfd_msp430_arch =
+-  N (16, bfd_mach_msp14, "msp:14", TRUE, & arch_info_struct[0]);
++  N (32, bfd_mach_msp430x, "MSP430X", TRUE, & arch_info_struct[0]);
+ 
+diff -ruN gdb-8.1/bfd/elf.c gdb-8.1-msp430/bfd/elf.c
+--- gdb-8.1/bfd/elf.c	2018-01-30 18:58:50.000000000 -0800
++++ gdb-8.1-msp430/bfd/elf.c	2019-06-25 02:31:56.063961795 -0700
+@@ -6320,6 +6320,17 @@
+   if (! abfd->output_has_begun
+       && ! _bfd_elf_compute_section_file_positions (abfd, NULL))
+     return FALSE;
++  /* Do not rewrite ELF data when opening an existing BFD for update.
++     abfd->output_has_begun has been set to TRUE, so creation of new sections,
++     and modification to existing section sizes is restricted. This means the
++     ELF header, program headers and section headers can't have changed.
++     If the contents of any sections has been modified, then those changes have
++     already been written to the BFD.  */
++  else if (abfd->direction == both_direction)
++    {
++      BFD_ASSERT (abfd->output_has_begun);
++      return TRUE;
++    }
+ 
+   i_shdrp = elf_elfsections (abfd);
+ 
+diff -ruN gdb-8.1/gdb/msp430-tdep.c gdb-8.1-msp430/gdb/msp430-tdep.c
+--- gdb-8.1/gdb/msp430-tdep.c	2018-01-30 18:58:50.000000000 -0800
++++ gdb-8.1-msp430/gdb/msp430-tdep.c	2019-06-25 02:31:56.063961795 -0700
+@@ -85,6 +85,7 @@
+ 
+ enum
+ {
++  MSP_ISA_NULL,
+   /* TI MSP430 Architecture.  */
+   MSP_ISA_MSP430,
+ 
+@@ -94,6 +95,7 @@
+ 
+ enum
+ {
++  MSP_NULL_CODE_MODEL,
+   /* The small code model limits code addresses to 16 bits.  */
+   MSP_SMALL_CODE_MODEL,
+ 
+@@ -859,7 +861,9 @@
+ {
+   struct gdbarch *gdbarch;
+   struct gdbarch_tdep *tdep;
+-  int elf_flags, isa, code_model;
++  int elf_flags;
++  int isa = MSP_ISA_NULL;
++  int code_model = MSP_NULL_CODE_MODEL;
+ 
+   /* Extract the elf_flags if available.  */
+   if (info.abfd != NULL
+@@ -901,11 +905,17 @@
+ 	  struct gdbarch *ca = get_current_arch ();
+ 	  if (ca && gdbarch_bfd_arch_info (ca)->arch == bfd_arch_msp430)
+ 	    {
+-	      struct gdbarch_tdep *ca_tdep = gdbarch_tdep (ca);
++	      /* An explicit change of architecture may have been requested by
++		 the user, so only use the data from the current architecture
++		 if the machines match.  */
++	      if (gdbarch_bfd_arch_info (ca)->mach == info.bfd_arch_info->mach)
++		{
++		  struct gdbarch_tdep *ca_tdep = gdbarch_tdep (ca);
+ 
+-	      elf_flags = ca_tdep->elf_flags;
+-	      isa = ca_tdep->isa;
+-	      code_model = ca_tdep->code_model;
++		  elf_flags = ca_tdep->elf_flags;
++		  isa = ca_tdep->isa;
++		  code_model = ca_tdep->code_model;
++		}
+ 	      break;
+ 	    }
+ 	  /* Otherwise, fall through...  */
+@@ -914,10 +924,21 @@
+ 	error (_("Unknown msp430 isa"));
+ 	break;
+       }
+-  else
++  if (isa == MSP_ISA_NULL || code_model == MSP_NULL_CODE_MODEL)
+     {
+-      isa = MSP_ISA_MSP430;
+-      code_model = MSP_SMALL_CODE_MODEL;
++      /* Infer ISA and code model from bits_per_address as set in
++	 bfd/cpu-msp430.c.  */
++      if (info.bfd_arch_info->arch == bfd_arch_msp430
++	       && info.bfd_arch_info->bits_per_address == 32)
++	{
++	  isa = MSP_ISA_MSP430X;
++	  code_model = MSP_LARGE_CODE_MODEL;
++	}
++      else
++	{
++	  isa = MSP_ISA_MSP430;
++	  code_model = MSP_SMALL_CODE_MODEL;
++	}
+     }
+ 
+ 
+diff -ruN gdb-8.1/gdb/testsuite/gdb.arch/msp430-code-model.c gdb-8.1-msp430/gdb/testsuite/gdb.arch/msp430-code-model.c
+--- gdb-8.1/gdb/testsuite/gdb.arch/msp430-code-model.c	1969-12-31 16:00:00.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.arch/msp430-code-model.c	2019-06-25 02:31:56.063961795 -0700
+@@ -0,0 +1,5 @@
++int main(void)
++{
++  while(1);
++  return 0;
++}
+diff -ruN gdb-8.1/gdb/testsuite/gdb.arch/msp430-code-model.exp gdb-8.1-msp430/gdb/testsuite/gdb.arch/msp430-code-model.exp
+--- gdb-8.1/gdb/testsuite/gdb.arch/msp430-code-model.exp	1969-12-31 16:00:00.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.arch/msp430-code-model.exp	2019-06-25 02:31:56.063961795 -0700
+@@ -0,0 +1,53 @@
++# Test that msp430 code model is set correctly when changing architecture
++
++if ![istarget "msp430*"] then {
++    verbose "Skipping msp430-code-model.exp"
++    return
++}
++
++standard_testfile
++gdb_compile "${srcdir}/${subdir}/${srcfile}" ${binfile} executable ""
++
++set hexfile "${binfile}.hex"
++set objcopy_program [gdb_find_objcopy]
++if { $objcopy_program != "" } {
++    set result [catch "exec $objcopy_program -O ihex ${binfile} ${hexfile}" output]
++    if { $result != 0 } {
++        fail "error in objcopy command"
++        verbose -log "$output"
++        return -1
++    }
++    set hexgen 1
++} else {
++    set hexgen 0
++}
++
++proc msp430_test_code_model { ver } {
++    # Large model should be set by default without any prior ELF information
++    gdb_test "x /x 0x10000" "0x10000:.*" "successfully examine large model address with default model ($ver)"
++    gdb_test "set arch MSP430" "The target architecture is assumed to be MSP430\[^X\]" "set small model ($ver)"
++    gdb_test "x /x 0x10000" "0x0\+:.*" "unsuccessfully examine large model address with small model ($ver)"
++    gdb_test "set arch MSP430X" "The target architecture is assumed to be MSP430X" "set large model ($ver)"
++    gdb_test "x /x 0x10000" "0x10000:.*" "successfully examine large model address with large model ($ver)"
++}
++
++gdb_exit
++gdb_start
++msp430_test_code_model 1
++
++if { $hexgen == 0 } {
++    return
++}
++
++gdb_exit
++gdb_start
++gdb_load ${hexfile}
++msp430_test_code_model 2
++
++# gdb_load specifies the hexfile with the 'file' command, and GDB's internal
++# behaviour is different to the following flow.
++gdb_exit
++gdb_start
++send_gdb "target sim\n"
++send_gdb "load ${hexfile}\n"
++msp430_test_code_model 3
+diff -ruN gdb-8.1/gdb/testsuite/gdb.base/examine-backward.c gdb-8.1-msp430/gdb/testsuite/gdb.base/examine-backward.c
+--- gdb-8.1/gdb/testsuite/gdb.base/examine-backward.c	2018-01-04 20:07:23.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.base/examine-backward.c	2019-06-25 02:31:56.063961795 -0700
+@@ -40,7 +40,9 @@
+   0x00,
+ };
+ 
+-const char TestStrings[] = {
++/* FIXME massive alignment fixes somme of the tests in this suite, but is
++   probably just a work around.  */
++__attribute__((aligned(32))) const char TestStrings[] = {
+   0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
+   0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50,
+   0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58,
+@@ -54,7 +56,7 @@
+   0x00
+ };
+ 
+-const short TestStringsH[] = {
++__attribute__((aligned(32))) const short TestStringsH[] = {
+   0x0041, 0x0042, 0x0043, 0x0044, 0x0045, 0x0046, 0x0047, 0x0048,
+   0x0049, 0x004a, 0x004b, 0x004c, 0x004d, 0x004e, 0x004f, 0x0050,
+   0x0051, 0x0052, 0x0053, 0x0054, 0x0055, 0x0056, 0x0057, 0x0058,
+@@ -67,7 +69,7 @@
+   0x0000
+ };
+ 
+-const int TestStringsW[] = {
++__attribute__((aligned(32))) const int TestStringsW[] = {
+   0x00000041, 0x00000042, 0x00000043, 0x00000044,
+   0x00000045, 0x00000046, 0x00000047, 0x00000048,
+   0x00000049, 0x0000004a, 0x0000004b, 0x0000004c,
+diff -ruN gdb-8.1/gdb/testsuite/gdb.base/examine-backward.exp gdb-8.1-msp430/gdb/testsuite/gdb.base/examine-backward.exp
+--- gdb-8.1/gdb/testsuite/gdb.base/examine-backward.exp	2018-01-04 20:07:23.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.base/examine-backward.exp	2019-06-25 02:31:56.063961795 -0700
+@@ -87,7 +87,7 @@
+         set address_zero "0x0"
+         set byte "\t0x\[0-9a-f\]+"
+         gdb_test "x/3xb ${address_zero}" \
+-            "0x\[0-9a-f\]+00.*:${byte}${byte}${byte}" \
++            "0x0.*:${byte}${byte}${byte}" \
+             "examine 3 bytes forward from ${address_zero}"
+         gdb_test "x/-6x" \
+             "0x\[0-9a-f\]+fd.*:${byte}${byte}${byte}${byte}${byte}${byte}" \
+diff -ruN gdb-8.1/gdb/testsuite/gdb.base/relocate.exp gdb-8.1-msp430/gdb/testsuite/gdb.base/relocate.exp
+--- gdb-8.1/gdb/testsuite/gdb.base/relocate.exp	2018-01-04 20:07:23.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.base/relocate.exp	2019-06-25 02:31:56.063961795 -0700
+@@ -187,7 +187,9 @@
+ 	"y"
+ 
+ # Print the addresses of functions.
+-set new_function_foo_addr [get_var_address function_foo]
++with_test_prefix "with-offset" {
++  set new_function_foo_addr [get_var_address function_foo]
++}
+ 
+ # Make sure they have different addresses.
+ if { "${function_foo_addr}" == "${new_function_foo_addr}" } {
+diff -ruN gdb-8.1/gdb/testsuite/gdb.base/reread.exp gdb-8.1-msp430/gdb/testsuite/gdb.base/reread.exp
+--- gdb-8.1/gdb/testsuite/gdb.base/reread.exp	2018-01-04 20:07:23.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.base/reread.exp	2019-06-25 02:31:56.063961795 -0700
+@@ -45,7 +45,7 @@
+ 	set testfile2_opt1 [list debug nowarnings \
+ 				additional_flags=[lindex $opts 0] \
+ 				[lindex $opts 1]]
+-	set testfile2_op2 [list debug nowarnings \
++	set testfile2_opt2 [list debug nowarnings \
+ 			       "additional_flags=-DNO_SECTIONS [lindex $opts 0]" \
+ 			       [lindex $opts 1]]
+ 	if  { [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${binfile2}" \
+diff -ruN gdb-8.1/gdb/testsuite/gdb.base/share-env-with-gdbserver.exp gdb-8.1-msp430/gdb/testsuite/gdb.base/share-env-with-gdbserver.exp
+--- gdb-8.1/gdb/testsuite/gdb.base/share-env-with-gdbserver.exp	2018-01-04 20:07:23.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.base/share-env-with-gdbserver.exp	2019-06-25 02:31:56.063961795 -0700
+@@ -21,6 +21,11 @@
+     return
+ }
+ 
++# No concept of environment variables in a baremetal program
++if [target_info exists baremetal] {
++    return
++}
++
+ standard_testfile
+ 
+ if { [prepare_for_testing "failed to prepare" $testfile $srcfile debug] } {
+diff -ruN gdb-8.1/gdb/testsuite/gdb.base/testenv.exp gdb-8.1-msp430/gdb/testsuite/gdb.base/testenv.exp
+--- gdb-8.1/gdb/testsuite/gdb.base/testenv.exp	2018-01-04 20:07:23.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.base/testenv.exp	2019-06-25 02:31:56.063961795 -0700
+@@ -24,6 +24,11 @@
+     return
+ }
+ 
++# No concept of environment variables in a baremetal program
++if [target_info exists baremetal] {
++    return
++}
++
+ standard_testfile .c
+ 
+ # Compile binary
+diff -ruN gdb-8.1/gdb/testsuite/gdb.base/write_mem.c gdb-8.1-msp430/gdb/testsuite/gdb.base/write_mem.c
+--- gdb-8.1/gdb/testsuite/gdb.base/write_mem.c	1969-12-31 16:00:00.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.base/write_mem.c	2019-06-25 02:31:56.063961795 -0700
+@@ -0,0 +1,7 @@
++/* Test for PR gdb/20948.  */
++
++int main (void)
++{
++  while (1);
++  return 0;
++}
+diff -ruN gdb-8.1/gdb/testsuite/gdb.base/write_mem.exp gdb-8.1-msp430/gdb/testsuite/gdb.base/write_mem.exp
+--- gdb-8.1/gdb/testsuite/gdb.base/write_mem.exp	1969-12-31 16:00:00.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.base/write_mem.exp	2019-06-25 02:31:56.063961795 -0700
+@@ -0,0 +1,34 @@
++# Test for PR gdb/20948
++# Verify that invoking gdb with the --write argument works as expected
++
++global GDBFLAGS
++
++standard_testfile
++
++global srcdir
++global subdir
++
++if {[build_executable $testfile.exp $testfile \
++    $srcfile [list debug nowarnings] ] == -1} {
++	untested $testfile.exp
++	  return -1
++}
++
++clean_restart
++
++# Expect a failure before --write has been added to the command line
++test_print_reject "set {int}&main = 0x4242"
++
++set old_gdbflags $GDBFLAGS
++set GDBFLAGS "$old_gdbflags --write $binfile"
++clean_restart
++
++# Setting memory should now work correctly
++gdb_test_no_output "set {int}&main = 0x4242"
++
++# Check that memory write persists after quitting GDB
++gdb_exit
++gdb_start
++gdb_test "x /xh main" "<main>:.*4242"
++
++set GDBFLAGS $old_gdbflags
+diff -ruN gdb-8.1/gdb/testsuite/gdb.dwarf2/comp-unit-lang.exp gdb-8.1-msp430/gdb/testsuite/gdb.dwarf2/comp-unit-lang.exp
+--- gdb-8.1/gdb/testsuite/gdb.dwarf2/comp-unit-lang.exp	2018-01-04 20:07:23.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.dwarf2/comp-unit-lang.exp	2019-06-25 02:31:56.063961795 -0700
+@@ -70,7 +70,7 @@
+ 	return -1
+     }
+ 
+-    gdb_test "show language" "\"auto; currently $gdb_lang\".*"
++    gdb_test "show language $gdb_lang" "\"auto; currently $gdb_lang\".*"
+ }
+ 
+ # Some paths in the debugger fall back to C.  Check C++ as well to
+diff -ruN gdb-8.1/gdb/testsuite/gdb.dwarf2/dw2-dir-file-name.exp gdb-8.1-msp430/gdb/testsuite/gdb.dwarf2/dw2-dir-file-name.exp
+--- gdb-8.1/gdb/testsuite/gdb.dwarf2/dw2-dir-file-name.exp	2018-01-04 20:07:23.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.dwarf2/dw2-dir-file-name.exp	2019-06-25 02:31:56.063961795 -0700
+@@ -388,21 +388,22 @@
+ 
+ 	gdb_test_no_output "set filename-display absolute"
+ 	verbose -log "expect: ${absolute}"
+-	gdb_test "frame" " in $func \\(\\) at [string_to_regexp ${absolute}]:999" "absolute"
++	gdb_test "frame" "$func \\(\\) at [string_to_regexp ${absolute}]:999" "absolute"
+ 
+ 	gdb_test_no_output "set filename-display basename"
+ 	verbose -log "expect: [file tail $filename]"
+-	gdb_test "frame" " in $func \\(\\) at [string_to_regexp [file tail $filename]]:999" "basename"
++	gdb_test "frame" "$func \\(\\) at [string_to_regexp [file tail $filename]]:999" "basename"
+ 
+ 	gdb_test_no_output "set filename-display relative"
+ 	verbose -log "expect: $filename"
+-	gdb_test "frame" " in $func \\(\\) at [string_to_regexp $filename]:999" "relative"
++	gdb_test "frame" "$func \\(\\) at [string_to_regexp $filename]:999" "relative"
+     }
+ }
+ 
+ set bdir "${srcabsdir}"
+ set file "${srctmpfile}"
+ test "compdir_missing__ldir_missing__file_basename" "$bdir/rdir" "$file"
++return
+ test "compdir_missing__ldir_missing__file_relative" "$bdir/rdir" "fdir/$file"
+ test "compdir_missing__ldir_missing__file_absolute" "" "$bdir/$file"
+ test "compdir_missing__ldir_relative_file_basename" "$bdir/rdir" "ldir/$file"
+diff -ruN gdb-8.1/gdb/testsuite/gdb.mi/mi-exec-run.exp gdb-8.1-msp430/gdb/testsuite/gdb.mi/mi-exec-run.exp
+--- gdb-8.1/gdb/testsuite/gdb.mi/mi-exec-run.exp	2018-01-04 20:07:23.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/gdb.mi/mi-exec-run.exp	2019-06-25 02:31:56.063961795 -0700
+@@ -64,6 +64,11 @@
+ 	return
+     }
+ 
++    # Changing permissions on bin_file has no effect on simulators.
++    if {[target_info protocol] == "sim" && $force_fail} {
++	return
++    }
++
+     if {$force_fail} {
+ 	# Disable the shell so that its the first exec that fails,
+ 	# instead of the shell starting and then failing with some
+diff -ruN gdb-8.1/gdb/testsuite/lib/gdb.exp gdb-8.1-msp430/gdb/testsuite/lib/gdb.exp
+--- gdb-8.1/gdb/testsuite/lib/gdb.exp	2018-01-30 18:58:50.000000000 -0800
++++ gdb-8.1-msp430/gdb/testsuite/lib/gdb.exp	2019-06-25 02:31:56.063961795 -0700
+@@ -633,7 +633,7 @@
+     set full_name "continue to breakpoint: $name"
+ 
+     gdb_test_multiple "continue" $full_name {
+-	-re "(?:Breakpoint|Temporary breakpoint) .* (at|in) $location_pattern\r\n$gdb_prompt $" {
++	-re "(?:Breakpoint|Temporary breakpoint) .* $location_pattern\r\n$gdb_prompt $" {
+ 	    pass $full_name
+ 	}
+     }
+@@ -3501,15 +3501,15 @@
+     global gdb_saved_set_unbuffered_mode_obj
+ 
+     set outdir [file dirname $dest]
++    set new_options {}
+ 
+     # Add platform-specific options if a shared library was specified using
+     # "shlib=librarypath" in OPTIONS.
+     if {[lsearch -exact $options rust] != -1} {
+ 	# -fdiagnostics-color is not a rustcc option.
+     } else {
+-	set new_options [universal_compile_options]
++	lappend new_options [universal_compile_options]
+     }
+-    set new_options {}
+     set shlib_found 0
+     set shlib_load 0
+     foreach opt $options {

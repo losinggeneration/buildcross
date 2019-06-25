@@ -61,7 +61,7 @@ Debug()
 # "Message to display" can be left off to display the command instead of the
 # message in Result
 # NOTE:
-# 	This can't handle redirection of commands like:
+#	This can't handle redirection of commands like:
 #	sed "s/test/test2/" > output
 #	Those commands must be done as normal commands and not through this
 ###############################################################################
@@ -79,6 +79,7 @@ ExecuteCmd()
 		OUTPUT=$1
 	fi
 
+	local PATH=$INSTALL/bin:$PATH
 	if [ "$SILENT" -eq 0 ]; then
 		$1
 	else
@@ -93,6 +94,7 @@ ExecuteCmd()
 ###############################################################################
 QuietExec()
 {
+	local PATH=$INSTALL/bin:$PATH
 	if [ "$SILENT" -eq 0 ]; then
 		$*
 	else
@@ -108,7 +110,7 @@ QuietExec()
 ###############################################################################
 # See if a command like make exited cleanly
 ###############################################################################
-Result() 
+Result()
 {
 	# I assume the programmers use 0 for success and other values for not
 	if [ $? -eq 0 ]; then
@@ -325,8 +327,8 @@ Download()
 			fi
 			;;
 		"gdb")
-			if ! CheckExists .$GDB-downloaded || ! CheckExists $GDB.tar.bz2; then
-				ExecuteCmd "wget -c https://ftp.gnu.org/gnu/gdb/$GDB.tar.bz2"
+			if ! CheckExists .$GDB-downloaded || ! CheckExists $GDB.tar.gz; then
+				ExecuteCmd "wget -c https://ftpmirror.gnu.org/gnu/gdb/$GDB.tar.gz"
 				QuietExec "touch .$GDB-downloaded"
 			fi
 			;;

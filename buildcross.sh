@@ -35,7 +35,7 @@ BUILDCROSS_VERSION=1.9.0
 # how to configure/build each (Binutils, Gcc, Newlib, uClibc, & KOS)
 . ./build.sh
 
-[ -f ".env" ] && . .env
+[ -f ".env" ] && . ./.env
 
 ###############################################################################
 # Our main function because I like C-like code

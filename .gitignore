@@ -3,3 +3,6 @@
 .*.swp
 *.bz2
 *.gz
+.env
+builds/
+downloads/

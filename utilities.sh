@@ -184,9 +184,7 @@ UntarPatch()
 {
 	CreateDir
 
-	# check if the directory for the source exists
-	# and that we got to touch that it's untared
-	[ ! -d "$SYSTEM/$1-$2" -o ! -e "$SYSTEM/$1-$2/.untared-$2" ] && Untar $1 $2
+	Untar $1 $2 $3
 
 	# We send all parameters because the first is $1 and the rest
 	# are the patches, the format we want.
@@ -194,47 +192,38 @@ UntarPatch()
 }
 
 ###############################################################################
-# 1) Try to create directories if needed
-# 2) If untar returns true than patch it
-# Otherwise it does nothing
-# $1 is the source version
-# $2 is the language
-###############################################################################
-GccUntar()
-{
-	CreateDir
-
-	# check if the directory for the source exists
-	# and that we got to touch that it's untared
-	[ ! -d "$SYSTEM/$GCC" -o ! -e "$SYSTEM/$GCC/.untared-$2-$1" ] && Untar gcc $GCCVER $2
-}
-
-###############################################################################
 # Untar the source if needed
 ###############################################################################
 Untar()
 {
-	lver="$2"
+	local name="$1"
+	local lver="$2"
+
+	local nameVer=$name-$lver
+	local dirVer=$nameVer
+	[ $name = "nuttx" ] && dirVer=nuttx-$nameVer
+
+	[ -d "$BUILDDIR/$SYSTEM/$dirVer" -a -e "$BUILDDIR/$SYSTEM/$dirVer/.untared-$lver" ] && return
 
 	# Make sure to it's downloaded
-	Download $1 $lver
+	Download $name $lver
 
 	# Now check if the tar file exists
-	if CheckExists $1-$lver.tar.gz; then
+	if CheckExists "$DOWNLOADDIR/${nameVer}.tar.gz"; then
 		# We have the tar.gz hooray
-		ExecuteCmd "tar xfz $1-$lver.tar.gz -C $SYSTEM" "Untaring $1-$lver.tar.gz"
-	elif CheckExists $1-$lver.tar.bz2; then
+		ExecuteCmd "tar xfz $DOWNLOADDIR/${nameVer}.tar.gz -C $BUILDDIR/$SYSTEM" "Untaring ${nameVer}.tar.gz"
+	elif CheckExists "$DOWNLOADDIR/${nameVer}.tar.bz2"; then
 		# Well we have the tar.bz2 good job
-		ExecuteCmd "tar xfj $1-$lver.tar.bz2 -C $SYSTEM" "Untaring $1-$lver.tar.bz2"
-	elif CheckExists $1-$lver.tar.xz; then
+		ExecuteCmd "tar xfj $DOWNLOADDIR/${nameVer}.tar.bz2 -C $BUILDDIR/$SYSTEM" "Untaring ${nameVer}.tar.bz2"
+	elif CheckExists "$DOWNLOADDIR/${nameVer}.tar.xz"; then
 		# We have the tar.xz
-		ExecuteCmd "tar xfJ $1-$lver.tar.xz -C $SYSTEM" "Untaring $1-$lver.tar.xz"
+		ExecuteCmd "tar xfJ $DOWNLOADDIR/${nameVer}.tar.xz -C $BUILDDIR/$SYSTEM" "Untaring ${nameVer}.tar.xz"
 	else
-		LogFatal "Cannot untar $1-$lver.tar.bz2 or $1-$lver.tar.gz. Make sure .$1-$lver-downloaded doesn't exist or the file might be corrupt. If you do get this message tell me how, because it seems like it shouldn't ever come up."
+		LogFatal "Cannot untar $DOWNLOADDIR/${nameVer}.tar.* Make sure $DOWNLOADDIR/.$nameVer-downloaded doesn't exist or the file might be corrupt. If you do get this message tell me how, because it seems like it shouldn't ever come up."
 	fi
 
 	# A quick way to tell if we need to untar or not
-	QuietExec "touch $SYSTEM/$1-$2/.untared-$lver"
+	QuietExec "touch $BUILDDIR/$SYSTEM/$dirVer/.untared-$lver"
 }
 
 GetKernelBase() {
@@ -255,57 +244,57 @@ Download()
 {
 	case $1 in
 		"binutils")
-			if ! CheckExists .$BINUTILS-downloaded || ! CheckExists $BINUTILS.tar.bz2 ; then
-				ExecuteCmd "wget -c https://ftpmirror.gnu.org/gnu/binutils/$BINUTILS.tar.bz2"
-				QuietExec "touch .$BINUTILS-downloaded"
+			if ! CheckExists $DOWNLOADDIR/.$BINUTILS-downloaded || ! CheckExists $DOWNLOADDIR/$BINUTILS.tar.bz2; then
+				ExecuteCmd "wget -O $DOWNLOADDIR/$BINUTILS.tar.bz2 -c https://ftpmirror.gnu.org/gnu/binutils/$BINUTILS.tar.bz2"
+				QuietExec "touch $DOWNLOADDIR/.$BINUTILS-downloaded"
 			fi
 			;;
 		"gcc")
-			if ! CheckExists .$GCC-downloaded || ! CheckExists $GCC.tar.gz; then
-				ExecuteCmd "wget -c https://ftpmirror.gnu.org/gnu/gcc/$GCC/$GCC.tar.gz"
-				QuietExec "touch .$GCC-downloaded"
+			if ! CheckExists $DOWNLOADDIR/.$GCC-downloaded || ! CheckExists $DOWNLOADDIR/$GCC.tar.gz; then
+				ExecuteCmd "wget -O $DOWNLOADDIR/$GCC.tar.gz -c https://ftpmirror.gnu.org/gnu/gcc/$GCC/$GCC.tar.gz"
+				QuietExec "touch $DOWNLOADDIR/.$GCC-downloaded"
 			fi
 			;;
 		"newlib")
-			if ! CheckExists .$NEWLIB-downloaded || ! CheckExists $NEWLIB.tar.gz; then
-				ExecuteCmd "wget -c https://sourceware.org/pub/newlib/$NEWLIB.tar.gz"
-				QuietExec "touch .$NEWLIB-downloaded"
+			if ! CheckExists $DOWNLOADDIR/.$NEWLIB-downloaded || ! CheckExists $DOWNLOADDIR/$NEWLIB.tar.gz; then
+				ExecuteCmd "wget -O $DOWNLOADDIR/$NEWLIB.tar.gz -c https://sourceware.org/pub/newlib/$NEWLIB.tar.gz"
+				QuietExec "touch $DOWNLOADDIR/.$NEWLIB-downloaded"
 			fi
 			;;
 		"uClibc")
-			if ! CheckExists .$UCLIBC-downloaded || ! CheckExists $UCLIBC.tar.bz2; then
+			if ! CheckExists $DOWNLOADDIR/.$UCLIBC-downloaded || ! CheckExists $DOWNLOADDIR/$UCLIBC.tar.bz2; then
 				if [ $(echo $UCLIBC | grep snapshot) ]; then
-					ExecuteCmd "wget -c http://uclibc.org/downloads/snapshots/$UCLIBC.tar.bz2"
+					ExecuteCmd "wget -O $DOWNLOADDIR/$UCLIBC.tar.bz2 -c http://uclibc.org/downloads/snapshots/$UCLIBC.tar.bz2"
 				elif [ $(echo $UCLIBC | grep "\." ) ]; then
-					ExecuteCmd "wget -c http://uclibc.org/downloads/$UCLIBC.tar.bz2"
+					ExecuteCmd "wget -O $DOWNLOADDIR/$UCLIBC.tar.bz2 -c http://uclibc.org/downloads/$UCLIBC.tar.bz2"
 				else
-					QuietExec "cd $SYSTEM"
+					QuietExec "cd $BUILDDIR/$SYSTEM"
 					ExecuteCmd "svn co svn://uclibc.org/trunk/uClibc"
 					QuietExec "cd .."
 				fi
-				QuietExec "touch .$UCLIBC-downloaded"
+				QuietExec "touch $DOWNLOADDIR/.$UCLIBC-downloaded"
 			fi
 			;;
 		"glibc")
-			if ! CheckExists .$GLIBC-downloaded || ! CheckExists $GLIBC.tar.bz2; then
-				ExecuteCmd "wget -c https://ftpmirror.gnu.org/gnu/glibc/$GLIBC.tar.bz2"
-				QuietExec "touch .$GLIBC-downloaded"
+			if ! CheckExists $DOWNLOADDIR/.$GLIBC-downloaded || ! CheckExists $DOWNLOADDIR/$GLIBC.tar.bz2; then
+				ExecuteCmd "wget -O $DOWNLOADDIR/$GLIBC.tar.bz2 -c https://ftpmirror.gnu.org/gnu/glibc/$GLIBC.tar.bz2"
+				QuietExec "touch $DOWNLOADDIR/.$GLIBC-downloaded"
 			fi
 			;;
 		"avr-libc")
-			if ! CheckExists .$AVRLIBC-downloaded || ! CheckExists $AVRLIBC.tar.bz2; then
-				ExecuteCmd "wget -c http://savannah.nongnu.org/download/avr-libc/$AVRLIBC.tar.bz2"
-				QuietExec "touch .$AVRLIBC-downloaded"
+			if ! CheckExists $DOWNLOADDIR/.$AVRLIBC-downloaded || ! CheckExists $DOWNLOADDIR/$AVRLIBC.tar.bz2; then
+				ExecuteCmd "wget -O $DOWNLOADDIR/$AVRLIBC.tar.bz2 -c http://savannah.nongnu.org/download/avr-libc/$AVRLIBC.tar.bz2"
+				QuietExec "touch $DOWNLOADDIR/.$AVRLIBC-downloaded"
 			fi
 			;;
 		"$KERNELNAME")
-			if ! CheckExists .$KERNEL-downloaded || ! CheckExists $KERNEL.tar.xz; then
+			if ! CheckExists $DOWNLOADDIR/.$KERNEL-downloaded || ! CheckExists $DOWNLOADDIR/$KERNEL.tar.xz; then
 				if [ $(echo $KERNEL | grep libc) ]; then
-					ExecuteCmd "wget -c http://ep09.pld-linux.org/~mmazur/linux-libc-headers/$KERNEL.tar.xz"
+					ExecuteCmd "wget -O $DOWNLOADDIR/$KERNEL.tar.xz -c http://ep09.pld-linux.org/~mmazur/linux-libc-headers/$KERNEL.tar.xz"
 				else
-					ExecuteCmd "wget -c http://www.kernel.org/pub/linux/kernel/v$(GetKernelBase)/$KERNEL.tar.xz"
+					ExecuteCmd "wget -O $DOWNLOADDIR/$KERNEL.tar.xz -c http://www.kernel.org/pub/linux/kernel/v$(GetKernelBase)/$KERNEL.tar.xz"
 				fi
-				QuietExec "touch .$KERNEL-downloaded"
+				QuietExec "touch $DOWNLOADDIR/.$KERNEL-downloaded"
 			fi
 			;;
 		"kos")
@@ -322,14 +311,15 @@ Download()
 			QuietExec "cd $BASEDIR"
 			;;
 		"nuttx")
-			if ! CheckExists .$NUTTX-downloaded || ! CheckExists $NUTTX.tar.gz; then
-				ExecuteCmd "wget -c http://downloads.sourceforge.net/project/nuttx/nuttx/$NUTTX/$NUTTX.tar.gz"
+			if ! CheckExists $DOWNLOADDIR/.$NUTTX-downloaded || ! CheckExists $DOWNLOADDIR/$NUTTX.tar.gz; then
+				ExecuteCmd "wget -O $DOWNLOADDIR/$NUTTX.tar.gz -c https://github.com/apache/nuttx/archive/refs/tags/$NUTTX.tar.gz"
+				QuietExec "touch $DOWNLOADDIR/.$NUTTX-downloaded"
 			fi
 			;;
 		"gdb")
-			if ! CheckExists .$GDB-downloaded || ! CheckExists $GDB.tar.gz; then
-				ExecuteCmd "wget -c https://ftpmirror.gnu.org/gnu/gdb/$GDB.tar.gz"
-				QuietExec "touch .$GDB-downloaded"
+			if ! CheckExists $DOWNLOADDIR/.$GDB-downloaded || ! CheckExists $DOWNLOADDIR/$GDB.tar.gz; then
+				ExecuteCmd "wget -O $DOWNLOADDIR/$GDB.tar.gz -c https://ftpmirror.gnu.org/gnu/gdb/$GDB.tar.gz"
+				QuietExec "touch $DOWNLOADDIR/.$GDB-downloaded"
 			fi
 			;;
 		*)
@@ -345,12 +335,14 @@ Download()
 ###############################################################################
 Patch()
 {
+    local LOC=$BUILDDIR/$SYSTEM/$1-$2
+
 	if [ $1 = "kos" ]; then
 		LOC=$KOSLOCATION
 	elif [ $1 = "kos-ports" ]; then
 		LOC=$KOSLOCATION/../kos-ports
-	else
-		LOC=$BASEDIR/$SYSTEM/$1-$2
+    elif [ $1 = "nuttx" ]; then
+		LOC=$BUILDDIR/$SYSTEM/$1-$1-$2
 	fi
 
 	# We need to get past the name/version so shift the params two or three
@@ -463,17 +455,17 @@ DistClean()
 	find . -name "*~" -exec rm {} \;
 	ExecuteCmd "rm -fr .linux-* .binutils-* .gcc-* .uClibc-* .newlib-* *.bz2 *.gz"
 	SetOptions Dreamcast
-	ExecuteCmd "rm -fr $SYSTEM"
+	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
 	SetOptions Gamecube
-	ExecuteCmd "rm -fr $SYSTEM"
+	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
 	SetOptions DcLinux
-	ExecuteCmd "rm -fr $SYSTEM"
+	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
 	SetOptions Genesis
-	ExecuteCmd "rm -fr $SYSTEM"
+	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
 	SetOptions GcLinux
-	ExecuteCmd "rm -fr $SYSTEM"
+	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
 	SetOptions Ix86
-	ExecuteCmd "rm -fr $SYSTEM"
+	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
 }
 
 ###############################################################################

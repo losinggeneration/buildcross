@@ -15,11 +15,18 @@ SILENT=0
 BASEDIR="$(pwd)"
 # Where the patches are
 PATCHBASEDIR="$BASEDIR/patches"
+# Where the builds are
+BUILDDIR="$BASEDIR/builds"
+# Where the downloads are
+DOWNLOADDIR="$BASEDIR/downloads"
 ###############################################################################
 # User changeable variables
 ###############################################################################
 # For the BSD people who need it to be gmake
 [ ! "$MAKE" ] && MAKE="make"
+
+[ ! -d "$BUILDDIR" ] && QuietExec "mkdir -p $BUILDDIR"
+[ ! -d "$DOWNLOADDIR" ] && QuietExec "mkdir -p $DOWNLOADDIR"
 
 # Where to send the output from make and configure
 if [ ! "$SENDTOWHERE" ]; then
@@ -129,10 +136,10 @@ SetOptions()
 	fi
 
 	# These are potentially unset, so make sure they're set to at least $SYSTEM/
-	[ ! "$NEWLIBBUILD" ] && NEWLIBBUILD="$SYSTEM"
-	[ ! "$UCLIBCDIR" ] && UCLIBCDIR="$SYSTEM"
-	[ ! "$GLIBCHDIR" ] && GLIBCHDIR="$SYSTEM"
-	[ ! "$GDBBUILD" ] && GDBBUILD="$SYSTEM"
+	[ ! "$NEWLIBBUILD" ] && NEWLIBBUILD="$BUILDDIR/$SYSTEM"
+	[ ! "$UCLIBCDIR" ] && UCLIBCDIR="$BUILDDIR/$SYSTEM"
+	[ ! "$GLIBCHDIR" ] && GLIBCHDIR="$BUILDDIR/$SYSTEM"
+	[ ! "$GDBBUILD" ] && GDBBUILD="$BUILDDIR/$SYSTEM"
 
 	# These are patches common to to all compilers. For instance, when a patch
 	# is required to build any compiler:
@@ -192,12 +199,12 @@ SetOptions()
 	GDBOPTS="$TARGET $HOST $PREFIX $GDBOPTS"
 
 	# Set up directory names
-	BINBUILD="$SYSTEM/binbuildelf"
-	GCCBUILD="$SYSTEM/gccbuildelf"
-	NEWLIBBUILD="$SYSTEM/newlibbuildelf"
-	AVRLIBCBUILD="$SYSTEM/avrlibcbuild"
-	NUTTXDIR="$SYSTEM/$NUTTX"
-	GDBBUILD="$SYSTEM/gdbbuild"
+	BINBUILD="$BUILDDIR/$SYSTEM/binbuildelf"
+	GCCBUILD="$BUILDDIR/$SYSTEM/gccbuildelf"
+	NEWLIBBUILD="$BUILDDIR/$SYSTEM/newlibbuildelf"
+	AVRLIBCBUILD="$BUILDDIR/$SYSTEM/avrlibcbuild"
+	NUTTXDIR="$BUILDDIR/$SYSTEM/nuttx-$NUTTX"
+	GDBBUILD="$BUILDDIR/$SYSTEM/gdbbuild"
 
 	# If the install directory doesn't exist make it
 	[ ! -d "$INSTALL" ] && QuietExec mkdir -p $INSTALL
@@ -626,7 +633,7 @@ ParseArgs()
 			return 0
 			;;
 		"-i")
-			rm $SYSTEM/*/.*installed*
+			rm $BUILDDIR/$SYSTEM/*/.*installed*
 			return 0
 			;;
 		"-distclean")

@@ -19,7 +19,7 @@ ConfigureBin()
 		# Remove the contents of the build directory
 		Remove $BINBUILD
 		# Go to the build directory
-		QuietExec "cd $BASEDIR/$BINBUILD"
+		QuietExec "cd $BINBUILD"
 
 		ExecuteCmd "../$BINUTILS/configure $BINOPTS" "Configuring Binutils"
 		QuietExec "touch .configure"
@@ -44,7 +44,7 @@ BuildBin()
 	# Check if we've installed binutils already
 	if ! CheckExists $BINBUILD/.installed; then
 		# Change to the build directory
-		QuietExec "cd $BASEDIR/$BINBUILD"
+		QuietExec "cd $$BINBUILD"
 
 		ExecuteCmd "$MAKE all"
 
@@ -74,7 +74,7 @@ ConfigureGcc()
 	if ! CheckExists $GCCBUILD/.configure-$1; then
 		# This will remove all files, but leave hidden ones
 		ExecuteCmd "rm -fr $GCCBUILD/*"
-		QuietExec "cd $BASEDIR/$GCCBUILD"
+		QuietExec "cd $GCCBUILD"
 
 		if [ "$1" = "Initial" ]; then
 			local OPTS="$GCCBOPTS"
@@ -100,7 +100,7 @@ BuildGcc()
 	LogTitle "Building $1 Gcc"
 
 	if ! CheckExists $GCCBUILD/.installed-$1; then
-		QuietExec "cd $BASEDIR/$GCCBUILD"
+		QuietExec "cd $GCCBUILD"
 
 		if [ "$1" = "Initial" ]; then
 			# Ok, Gcc 4.3 seems to change all-gcc's behavior. It's now split
@@ -140,7 +140,7 @@ ConfigureNewlib()
 
 	if ! CheckExists $NEWLIBBUILD/.configure; then
 		Remove $NEWLIBBUILD
-		QuietExec "cd $BASEDIR/$NEWLIBBUILD"
+		QuietExec "cd $NEWLIBBUILD"
 
 		ExecuteCmd "../$NEWLIB/configure $NEWLIBOPTS" "Configuring Newlib"
 		QuietExec "touch .configure"
@@ -157,8 +157,8 @@ ConfigureNewlib()
 BuildNewlib()
 {
 	LogTitle "Building Newlib"
-	if ! CheckExists $BASEDIR/$NEWLIBBUILD/.installed; then
-		QuietExec "cd $BASEDIR/$NEWLIBBUILD"
+	if ! CheckExists $NEWLIBBUILD/.installed; then
+		QuietExec "cd $NEWLIBBUILD"
 
 		ExecuteCmd "$MAKE"
 		ExecuteCmd "$MAKE install" "Building Newlib"
@@ -209,7 +209,7 @@ BuildNewlib()
 			fi
 		fi
 
-		QuietExec "touch $BASEDIR/$NEWLIBBUILD/.installed"
+		QuietExec "touch $NEWLIBBUILD/.installed"
 	else
 		LogTitle "Newlib already installed"
 	fi
@@ -228,7 +228,7 @@ ConfigureAVRlibc()
 
 	if ! CheckExists $AVRLIBCBUILD/.configure; then
 		Remove $AVRLIBCBUILD
-		QuietExec "cd $BASEDIR/$AVRLIBCBUILD"
+		QuietExec "cd $AVRLIBCBUILD"
 
 		ExecuteCmd "../$AVRLIBC/configure $AVRLIBCOPTS" "Configuring AVRlibc"
 		QuietExec "touch .configure"
@@ -247,7 +247,7 @@ BuildAVRlibc()
 	LogTitle "Building AVRlibc"
 
 	if ! CheckExists $AVRLIBCBUILD/.installed; then
-		QuietExec "cd $BASEDIR/$AVRLIBCBUILD"
+		QuietExec "cd $AVRLIBCBUILD"
 
 		ExecuteCmd "$MAKE"
 		ExecuteCmd "$MAKE install" "Installing AVRlibc"
@@ -261,7 +261,7 @@ ConfigureKernelHeaders()
 	# this if statemest probably isn't needed
 	if [ "$USEUCLIBC" ]; then
 		UntarPatch $KERNELNAME $KERNELVER $KERNELPATCH
-		QuietExec "cd $SYSTEM/$KERNEL"
+		QuietExec "cd $BUILDDIR/$SYSTEM/$KERNEL"
 
 		if [ $(echo $KERNEL | grep libc) ]; then
 			# If it's the old headers, we we'll cd to include
@@ -286,7 +286,7 @@ ConfigureKernelHeaders()
 			ExecuteCmd "make ARCH=$GENERICTARG CROSS_COMPILE=$TARG- INSTALL_HDR_PATH=$SYSROOT/usr headers_install"
 		fi
 	else
-		QuietExec "cd $BASEDIR/$SYSTEM/$KERNEL"
+		QuietExec "cd $BUILDDIR/$SYSTEM/$KERNEL"
 		if [ $(echo $KERNEL | grep libc) ]; then
 			ExecuteCmd "cp -r include/linux $HEADERSDIR"
 			#ExecuteCmd "cp -r include/asm-generic $HEADERSDIR/asm-generic"
@@ -315,9 +315,9 @@ ConfigureuClibc()
 		QuietExec "mkdir -p $UCLIBCHDIR/usr/lib"
 		QuietExec "mkdir -p $UCLIBCHDIR/lib"
 
-		QuietExec "cd $BASEDIR/$UCLIBCDIR"
+		QuietExec "cd $UCLIBCDIR"
 
-		sed -e "s,KERNELSOURCEDIR,$SYSROOT/usr/include," -e "s,COMPILERPREFIX,$TARG-," -e "s,SHAREDLIBPREFIX,$UCLIBCHDIR," -e "s,RUNDEVPREFIX,$UCLIBCHDIR/usr," $PATCHDIR/$UCLIBC-$SYSTEM-config > .config
+		sed -e "s,KERNELSOURCEDIR,$SYSROOT/usr/include," -e "s,COMPILERPREFIX,$TARG-," -e "s,SHAREDLIBPREFIX,$UCLIBCHDIR," -e "s,RUNDEVPREFIX,$UCLIBCHDIR/usr," $PATCHDIR/$UCLIBC-$SYSTEM-config >.config
 
 		ExecuteCmd "make V=1 PREFIX=$UCLIBCHDIR DEVEL_PREFIX=/usr/ RUNTIME_PREFIX=$UCLIBCHDIR headers install_headers"
 		QuietExec "touch .configure"
@@ -335,7 +335,7 @@ BuilduClibc()
 {
 	LogTitle "Building uClibc"
 	if ! CheckExists $UCLIBCDIR/.installed; then
-		QuietExec "cd $BASEDIR/$UCLIBCDIR"
+		QuietExec "cd $UCLIBCDIR"
 
 		ExecuteCmd "$MAKE"
 		ExecuteCmd "$MAKE install" "Building uClibc"
@@ -372,13 +372,13 @@ ConfigureGlibc()
 	QuietExec "mkdir -p $GLIBCDIR"
 
 	if ! CheckExists $GLIBCDIR/.configure-$1; then
-		QuietExec "cd $BASEDIR/$GCLIBCDIR"
+		QuietExec "cd $GCLIBCDIR"
 		if [ "$1" = "Headers" ]; then
 			# Prepare the linux headers
 			ConfigureKernelHeaders
 
 			# Now get the Glibc headers installed
-			QuietExec "cd $BASEDIR/$GLIBCDIR"
+			QuietExec "cd $GLIBCDIR"
 
 			CC=gcc ExecuteCmd "../$GLIBC/configure $GLIBCHOPTS" "Configuring Glibc Headers"
 			ExecuteCmd "$MAKE cross-compiling=yes install_root=$SYSROOT install-headers" "Installing Glibc Headers"
@@ -397,7 +397,7 @@ ConfigureGlibc()
 			QuietExec "cp bits/stdio_lim.h $HEADERSDIR/bits/stdio_lim.h"
 
 		else
-			QuietExec "cd $BASEDIR/$GLIBCDIR"
+			QuietExec "cd $GLIBCDIR"
 			# Remove contents that may be in there after initial configure/make"
 			QuietExec "rm -fr *"
 
@@ -430,7 +430,7 @@ BuildGlibc()
 {
 	LogTitle "Building Glibc $1"
 	if ! CheckExists $GLIBCDIR/.installed-$1; then
-		QuietExec "cd $BASEDIR/$GLIBCDIR"
+		QuietExec "cd $GLIBCDIR"
 
 		if [ "$1" = "Initial" ]; then
 			ExecuteCmd "$MAKE LD=$TARG-ld RANLIB=$TARG-ranlib lib"
@@ -578,7 +578,7 @@ ConfigureNuttX()
 	UntarPatch nuttx $NUTTXVER $NUTTXPATCH
 
 	if ! CheckExists $NUTTXBUILD/.configure; then
-		QuietExec "cd $BASEDIR/$NUTTXDIR"
+		QuietExec "cd $NUTTXDIR"
 		# Make sure we're building cleanly
 		ExecuteCmd "make distclean"
 
@@ -604,7 +604,7 @@ BuildNuttX()
 	LogTitle "Building NuttX"
 
 	# Change to the build directory
-	QuietExec "cd $BASEDIR/$NUTTXDIR"
+	QuietExec "cd $NUTTXDIR"
 
 	ExecuteCmd "$MAKE"
 
@@ -627,7 +627,7 @@ ConfigureGdb()
 		# Remove the contents of the build directory
 		Remove $GDBBUILD
 		# Go to the build directory
-		QuietExec "cd $BASEDIR/$GDBBUILD"
+		QuietExec "cd $GDBBUILD"
 
 		ExecuteCmd "../$GDB/configure $GDBOPTS" "Configuring Gdb"
 		QuietExec "touch .configure"
@@ -649,7 +649,7 @@ BuildGdb()
 	# Check if we've installed Gdb already
 	if ! CheckExists $GDBBUILD/.installed; then
 		# Change to the build directory
-		QuietExec "cd $BASEDIR/$GDBBUILD"
+		QuietExec "cd $GDBBUILD"
 
 		ExecuteCmd "$MAKE all"
 		ExecuteCmd "$MAKE install" "Building Gdb"
@@ -707,19 +707,19 @@ CleaningAll()
 	ConfigureBin
 	BuildBin
 	CleaningRemove $BINBUILD
-	QuietExec "rm -fr $BASEDIR/$SYSTEM/$BINUTILS"
+	QuietExec "rm -fr $BUILDDIR/$SYSTEM/$BINUTILS"
 	ConfigureGcc "Initial"
 	BuildGcc "Initial"
 	CleaningRemove $GCCBUILD
-	QuietExec "rm -fr $BASEDIR/$SYSTEM/$GCC"
+	QuietExec "rm -fr $BUILDDIR/$SYSTEM/$GCC"
 	ConfigureNewlib
 	BuildNewlib
 	CleaningRemove $NEWLIBBUILD
-	QuietExec "rm -fr $BASEDIR/$SYSTEM/$NEWLIB"
+	QuietExec "rm -fr $BUILDDIR/$SYSTEM/$NEWLIB"
 	ConfigureGcc "Final"
 	BuildGcc "Final"
 	CleaningRemove $GCCBUILD
-	QuietExec "rm -fr $BASEDIR/$SYSTEM/$GCC"
+	QuietExec "rm -fr $BUILDDIR/$SYSTEM/$GCC"
 }
 
 ###############################################################################
@@ -766,11 +766,11 @@ BuildCleaningDreamcast()
 		ConfigureBin
 		BuildBin
 		CleaningRemove $BINBUILD
-		QuietExec "rm -fr $BASEDIR/$SYSTEM/$BINUTILS"
+		QuietExec "rm -fr $BUILDDIR/$SYSTEM/$BINUTILS"
 		ConfigureGcc "Initial"
 		BuildGcc "Initial"
 		CleaningRemove $GCCBUILD
-		QuietExec "rm -fr $BASEDIR/$SYSTEM/$GCC"
+		QuietExec "rm -fr $BUILDDIR/$SYSTEM/$GCC"
 	fi
 
 	BuildKos
@@ -845,7 +845,7 @@ InstallGamecubeRules()
 
 InstallGamecubeTools()
 {
-	QuietExec "cd $BASEDIR/$SYSTEM"
+	QuietExec "cd $BUILDDIR/$SYSTEM"
 	# native tools
 	for tool in elf2dol gxtexconv general-tools; do
 		if [ ! -d $tool/.git ]; then

@@ -10,6 +10,7 @@
 ###############################################################################
 ConfigureBin()
 {
+    CheckSystem
 	LogTitle "Configuring Binutils"
 	# Try to Untar and Patch Binutils if needed
 	UntarPatch binutils $BINVER $BINPATCH
@@ -39,6 +40,7 @@ ConfigureBin()
 ###############################################################################
 BuildBin()
 {
+    CheckSystem
 	LogTitle "Building Binutils"
 
 	# Check if we've installed binutils already
@@ -66,6 +68,7 @@ BuildBin()
 ###############################################################################
 ConfigureGcc()
 {
+    CheckSystem
 	LogTitle "Configuring $1 Gcc"
 
 	# Try to Untar and Patch GCC if needed
@@ -97,6 +100,7 @@ ConfigureGcc()
 ###############################################################################
 BuildGcc()
 {
+    CheckSystem
 	LogTitle "Building $1 Gcc"
 
 	if ! CheckExists $GCCBUILD/.installed-$1; then
@@ -135,6 +139,7 @@ BuildGcc()
 ###############################################################################
 ConfigureNewlib()
 {
+    CheckSystem
 	LogTitle "Configuring Newlib"
 	UntarPatch newlib $NEWLIBVER $NEWLIBPATCH
 
@@ -156,6 +161,7 @@ ConfigureNewlib()
 ###############################################################################
 BuildNewlib()
 {
+    CheckSystem
 	LogTitle "Building Newlib"
 	if ! CheckExists $NEWLIBBUILD/.installed; then
 		QuietExec "cd $NEWLIBBUILD"
@@ -222,6 +228,7 @@ BuildNewlib()
 ###############################################################################
 ConfigureAVRlibc()
 {
+    CheckSystem
 	LogTitle "Configuring AVRlibc"
 
 	UntarPatch avr-libc $AVRLIBCVER $AVRLIBCPATCH
@@ -244,6 +251,7 @@ ConfigureAVRlibc()
 ###############################################################################
 BuildAVRlibc()
 {
+    CheckSystem
 	LogTitle "Building AVRlibc"
 
 	if ! CheckExists $AVRLIBCBUILD/.installed; then
@@ -258,6 +266,7 @@ BuildAVRlibc()
 
 ConfigureKernelHeaders()
 {
+    CheckSystem
 	# this if statemest probably isn't needed
 	if [ "$USEUCLIBC" ]; then
 		UntarPatch $KERNELNAME $KERNELVER $KERNELPATCH
@@ -302,6 +311,7 @@ ConfigureKernelHeaders()
 ###############################################################################
 ConfigureuClibc()
 {
+    CheckSystem
 	LogTitle "Configuring uClibc"
 	UntarPatch uClibc $UCLIBCVER $UCLIBCPATCH
 	UntarPatch $KERNELNAME $KERNELVER $KERNELPATCH
@@ -333,6 +343,7 @@ ConfigureuClibc()
 ###############################################################################
 BuilduClibc()
 {
+    CheckSystem
 	LogTitle "Building uClibc"
 	if ! CheckExists $UCLIBCDIR/.installed; then
 		QuietExec "cd $UCLIBCDIR"
@@ -366,6 +377,7 @@ BuilduClibc()
 ###############################################################################
 ConfigureGlibc()
 {
+    CheckSystem
 	LogTitle "Configuring Glibc $1"
 	UntarPatch glibc $GLIBCVER $GLIBCPATCH
 	UntarPatch $KERNELNAME $KERNELVER $KERNELPATCH
@@ -428,6 +440,7 @@ ConfigureGlibc()
 ###############################################################################
 BuildGlibc()
 {
+    CheckSystem
 	LogTitle "Building Glibc $1"
 	if ! CheckExists $GLIBCDIR/.installed-$1; then
 		QuietExec "cd $GLIBCDIR"
@@ -455,6 +468,7 @@ BuildGlibc()
 ###############################################################################
 BuildKos()
 {
+    CheckSystem
 	LogTitle "Building Kos"
 	case $KOSSYSINC in
 		"dc") ;;
@@ -574,6 +588,7 @@ BuildKos()
 
 ConfigureNuttX()
 {
+    CheckSystem
 	LogTitle "Configuring NuttX"
 	UntarPatch nuttx $NUTTXVER $NUTTXPATCH
 
@@ -601,6 +616,7 @@ ConfigureNuttX()
 
 BuildNuttX()
 {
+    CheckSystem
 	LogTitle "Building NuttX"
 
 	# Change to the build directory
@@ -618,6 +634,7 @@ BuildNuttX()
 ###############################################################################
 ConfigureGdb()
 {
+    CheckSystem
 	LogTitle "Configuring Gdb"
 	# Try to Untar and Patch Gdb if needed
 	UntarPatch gdb $GDBVER $GDBPATCH
@@ -644,6 +661,7 @@ ConfigureGdb()
 ###############################################################################
 BuildGdb()
 {
+    CheckSystem
 	LogTitle "Building Gdb"
 
 	# Check if we've installed Gdb already
@@ -668,7 +686,8 @@ BuildGdb()
 ###############################################################################
 All()
 {
-	LogTitle "Making complete compiler"
+    CheckSystem
+	LogTitle "Making complete 2 pass newlib compiler"
 	ConfigureBin
 	BuildBin
 	ConfigureGcc "Initial"
@@ -685,6 +704,7 @@ All()
 ###############################################################################
 SinglePass()
 {
+    CheckSystem
 	LogTitle "Making a single pass compiler"
 	ConfigureBin
 	BuildBin

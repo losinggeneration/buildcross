@@ -221,7 +221,7 @@ Usage()
 {
 	LogOutput "$0 usage:"
 	LogOutput "	These options must come first"
-	LogOutput "	dreamcast Build Gcc for Sega Dreamcast (default)"
+	LogOutput "	dreamcast Build Gcc for Sega Dreamcast"
 	LogOutput "	dclinux Build a Dreamcast Linux compiler"
 	LogOutput "	genesis Build Gcc for Sega Genesis"
 	LogOutput "	gamecube Build Gcc for Nintendo Gamecube"
@@ -241,8 +241,8 @@ Usage()
 	LogOutput "		of the tools.)"
 	LogOutput "	-nocolor Turn off colored output"
 	LogOutput
-	LogOutput "	-all Configure and build all in correct order"
-	LogOutput "	-allc Configure and build all in correct order, but clean"
+	LogOutput "	-all Configure and build two pass newlib compiler"
+	LogOutput "	-allc Configure and build two pass newlib compiler, but clean"
 	LogOutput "       objects and remove source after each is built"
 	LogOutput "	-single Run a single pass. Equivilant to -cb -bb -cfg -bfg [-ca -ba (AVR only)]"
 	LogOutput

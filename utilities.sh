@@ -165,6 +165,7 @@ LogFatal()
 ###############################################################################
 CreateDir()
 {
+	CheckSystem
 	[ ! -d "$BINBUILD" ] && QuietExec mkdir -p "$BINBUILD"
 	[ ! -d "$GCCBUILD" ] && QuietExec mkdir -p "$GCCBUILD"
 	[ ! -d "$NEWLIBBUILD" ] && QuietExec mkdir -p "$NEWLIBBUILD"
@@ -182,6 +183,7 @@ CreateDir()
 ###############################################################################
 UntarPatch()
 {
+	CheckSystem
 	CreateDir
 
 	Untar $1 $2 $3
@@ -196,6 +198,7 @@ UntarPatch()
 ###############################################################################
 Untar()
 {
+	CheckSystem
 	local name="$1"
 	local lver="$2"
 
@@ -242,6 +245,7 @@ GetKernelBase() {
 ###############################################################################
 Download()
 {
+	CheckSystem
 	case $1 in
 		"binutils")
 			if ! CheckExists $DOWNLOADDIR/.$BINUTILS-downloaded || ! CheckExists $DOWNLOADDIR/$BINUTILS.tar.bz2; then
@@ -335,6 +339,7 @@ Download()
 ###############################################################################
 Patch()
 {
+	CheckSystem
     local LOC=$BUILDDIR/$SYSTEM/$1-$2
 
 	if [ $1 = "kos" ]; then

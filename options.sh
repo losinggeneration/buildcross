@@ -152,6 +152,7 @@ SetOptions()
 	UCLIBC="uClibc-$UCLIBCVER"
 	KERNEL="$KERNELNAME-$KERNELVER"
 	NUTTX="nuttx-$NUTTXVER"
+	NUTTXAPPS="nuttx-apps-$NUTTXVER"
 	GDB="gdb-$GDBVER"
 
 	# Binutils patches

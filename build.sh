@@ -591,17 +591,18 @@ ConfigureNuttX()
     CheckSystem
 	LogTitle "Configuring NuttX"
 	UntarPatch nuttx $NUTTXVER $NUTTXPATCH
+	UntarPatch nuttx-apps $NUTTXVER $NUTTXPATCH
 
 	if ! CheckExists $NUTTXBUILD/.configure; then
 		QuietExec "cd $NUTTXDIR"
-		# Make sure we're building cleanly
-		ExecuteCmd "make distclean"
+		ExecuteCmd "./tools/configure.sh -a ../nuttx-apps-nuttx-$NUTTXVER $NUTTXBOARD/$NUTTXAPP"
 
-		QuietExec "cd tools"
-		ExecuteCmd "./configure.sh $NUTTXBOARD/$NUTTXAPP"
+		# Make sure we're building cleanly
+		[ -f ".config" ] && ExecuteCmd "make distclean"
+
+		ExecuteCmd "./tools/configure.sh -a ../nuttx-apps-nuttx-$NUTTXVER $NUTTXBOARD/$NUTTXAPP"
 
 		# Now copy the headers to the compiler
-		QuietExec "cd .."
 		QuietExec "mkdir -p $INSTALL/$TARG"
 		ExecuteCmd "make include/arch include/arch/chip include/arch/board include/nuttx/config.h"
 		ExecuteCmd "cp -Lr include $INSTALL/$TARG"

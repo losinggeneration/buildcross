@@ -205,6 +205,7 @@ Untar()
 	local nameVer=$name-$lver
 	local dirVer=$nameVer
 	[ $name = "nuttx" ] && dirVer=nuttx-$nameVer
+	[ $name = "nuttx-apps" ] && dirVer=$name-nuttx-$lver
 
 	[ -d "$BUILDDIR/$SYSTEM/$dirVer" -a -e "$BUILDDIR/$SYSTEM/$dirVer/.untared-$lver" ] && return
 
@@ -320,6 +321,12 @@ Download()
 				QuietExec "touch $DOWNLOADDIR/.$NUTTX-downloaded"
 			fi
 			;;
+		"nuttx-apps")
+			if ! CheckExists $DOWNLOADDIR/.$NUTTXAPPS-downloaded || ! CheckExists $DOWNLOADDIR/$NUTTXAPPS.tar.gz; then
+				ExecuteCmd "wget -O $DOWNLOADDIR/$NUTTXAPPS.tar.gz -c https://github.com/apache/nuttx-apps/archive/refs/tags/$NUTTX.tar.gz"
+				QuietExec "touch $DOWNLOADDIR/.$NUTTXAPPS-downloaded"
+			fi
+			;;
 		"gdb")
 			if ! CheckExists $DOWNLOADDIR/.$GDB-downloaded || ! CheckExists $DOWNLOADDIR/$GDB.tar.gz; then
 				ExecuteCmd "wget -O $DOWNLOADDIR/$GDB.tar.gz -c https://ftpmirror.gnu.org/gnu/gdb/$GDB.tar.gz"
@@ -347,7 +354,9 @@ Patch()
 	elif [ $1 = "kos-ports" ]; then
 		LOC=$KOSLOCATION/../kos-ports
     elif [ $1 = "nuttx" ]; then
-		LOC=$BUILDDIR/$SYSTEM/$1-$1-$2
+		LOC=$BUILDDIR/$SYSTEM/$1-nuttx-$2
+    elif [ $1 = "nuttx-apps" ]; then
+		LOC=$BUILDDIR/$SYSTEM/$1-nuttx-$2
 	fi
 
 	# We need to get past the name/version so shift the params two or three

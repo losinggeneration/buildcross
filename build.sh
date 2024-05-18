@@ -44,7 +44,7 @@ BuildBin()
 	# Check if we've installed binutils already
 	if ! CheckExists $BINBUILD/.installed; then
 		# Change to the build directory
-		QuietExec "cd $$BINBUILD"
+		QuietExec "cd $BINBUILD"
 
 		ExecuteCmd "$MAKE all"
 

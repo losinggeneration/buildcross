@@ -373,9 +373,9 @@ Patch()
 Remove()
 {
 	CheckSystem
-	if [ -d "$BASEDIR/$1" ]; then
-		LogOutput "Removing contents of $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*"
-		ExecuteCmd "rm -fr $BASEDIR/$1/* $BASEDIR/$1/.*config* $BASEDIR/$1/.*installed*" "Removing $1"
+	if [ -d "$1" ]; then
+		LogOutput "Removing contents of $1/* $1/.*config* $1/.*installed*"
+		ExecuteCmd "rm -fr $1/* $1/.*config* $1/.*installed*" "Removing $1"
 	fi
 }
 
@@ -385,9 +385,9 @@ Remove()
 CleaningRemove()
 {
 	CheckSystem
-	if [ -d "$BASEDIR/$1" ]; then
-		LogTitle "Removing contents of $BASEDIR/$1/*"
-		ExecuteCmd "rm -fr $BASEDIR/$1/*" "Removing contents of $BASEDIR/$1/*"
+	if [ -d "$1" ]; then
+		LogTitle "Removing contents of $1/*"
+		ExecuteCmd "rm -fr $1/*" "Removing contents of $1/*"
 	fi
 }
 
@@ -409,7 +409,7 @@ CleanInstall()
 CleanLocal()
 {
 	CheckSystem
-	LogTitle "Cleaning $BASEDIR Build files"
+	LogTitle "Cleaning $BUILDDIR/$SYSTEM Build files"
 	Remove $BINBUILD
 	Remove $GCCBUILD
 	Remove $NEWLIBBUILD
@@ -453,19 +453,8 @@ DistClean()
 	# I'd hate to see this in any other directory
 	QuietExec "cd $BASEDIR"
 	find . -name "*~" -exec rm {} \;
-	ExecuteCmd "rm -fr .linux-* .binutils-* .gcc-* .uClibc-* .newlib-* *.bz2 *.gz"
-	SetOptions Dreamcast
-	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
-	SetOptions Gamecube
-	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
-	SetOptions DcLinux
-	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
-	SetOptions Genesis
-	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
-	SetOptions GcLinux
-	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
-	SetOptions Ix86
-	ExecuteCmd "rm -fr $BUILDDIR/$SYSTEM"
+	ExecuteCmd "rm -fr $DOWNLOADDIR"
+	ExecuteCmd "rm -fr $BUILDDIR"
 }
 
 ###############################################################################

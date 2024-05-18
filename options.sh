@@ -130,9 +130,8 @@ SetOptions()
 	. ./options/$filename
 
 	# KOS should have a sane default location rather than the build directory
-	if [ ! "$KOSLOCATION" ]; then
+	if [ "$USEKOS" -a ! "$KOSLOCATION" ]; then
 		KOSLOCATION="$INSTALL/kos"
-		echo "KOSLOCATION: $KOSLOCATION"
 	fi
 
 	# These are potentially unset, so make sure they're set to at least $SYSTEM/
